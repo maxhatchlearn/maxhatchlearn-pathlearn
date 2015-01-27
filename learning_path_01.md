@@ -15,7 +15,7 @@ Arrays store sequences of `objects`. There are a few ways to create an `array`:
     some_squares = [4, 9, 16]
     some_fruits = ["pear", "apple", "banana"]
 
-![](https://s3.amazonaws.com/hlxbucket/pic.png)
+![](pic.png)
 
 ### Ruby Strings
 
