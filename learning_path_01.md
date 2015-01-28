@@ -42,8 +42,6 @@ Strings are how we represent text in Ruby. We need to protect the text from the 
 
 ### Super Hard Ruby and JavaScript Exam
 
-HERE IS MY EXAM DESCRIPTION
-
 | problem type | coding                                         
 |--------------|--------------------------------------------------------
 | name         | Method Chains
