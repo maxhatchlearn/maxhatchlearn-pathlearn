@@ -1,6 +1,30 @@
 Scala School
 ================================================================================
 
+## About and Approach
+
+### About and Approach
+
+**About**
+Scala school started as a series of lectures at Twitter to prepare experienced engineers to be productive [Scala](http://www.scala-lang.org/) programmers. Scala is a relatively new language, but draws on many familiar concepts. Thus, these lectures assumed the audience knew the concepts and showed how to use them in Scala. We found this an effective way of getting new engineers up to speed quickly. This is the written material that accompanied those lectures. We have found that these are useful in their own right.
+
+**Approach**
+We think it makes the most sense to approach teaching Scala not as if it were an improved Java but instead as a new language. Experience in Java is not expected. Focus will be on the interpreter and the object-functional style as well as the style of programming we do here. An emphasis will be placed on maintainability, clarity of expression, and leveraging the type system.
+
+Most of the lessons require no software other than a Scala REPL. The reader is encouraged to follow along, but also to go further! Use these lessons as a starting point to explore the language.
+
+**Also**
+You can learn more elsewhere:
+
+- **[Effective Scala](http://twitter.github.com/effectivescala/)** Twitter's "best practices" for Scala. Useful for understanding idioms in Twitter's code.
+- **[scala-lang.org Documentation](http://docs.scala-lang.org)** Links to tutorials, manuals, API reference, books, ...
+- **[Scala API Documentation](http://www.scala-lang.org/api/)**
+
+
+
+
+********************************************************************************
+
 ## Basics
 
 ### Basics
