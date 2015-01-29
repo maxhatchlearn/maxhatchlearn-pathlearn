@@ -3,6 +3,10 @@ Thinkster Django Angular tutorial
 
 ## Chapter 00
 
+### Building Web Applications with Django and AngularJS - Introduction
+
+[![](http://img.youtube.com/vi/ZvWHC0ColGE/0.jpg)](http://www.youtube.com/watch?v=ZvWHC0ColGE)
+
 ### Learning Django and AngularJS
 
 In this tutorial you will build a simplified Google+ clone called “Not Google Plus” with Django and AngularJS.
