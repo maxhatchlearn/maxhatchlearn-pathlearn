@@ -90,6 +90,8 @@ If all went well running the server with `python manage.py runserver` should all
 
 **Make sure your environment is running by visiting `http://localhost:8000/`**
 
+******************************************************************************
+
 ## Chapter 01
 
 ### Extending Django's built-in User model
@@ -349,6 +351,8 @@ If everything went well, you should be able to access the various attributes of 
 
 * Access the `Account` object you just created
 
+******************************************************************************
+
 ## Chapter 02
 
 ### Serializing the Account Model
@@ -490,6 +494,7 @@ By now we should have no problem seeing the serialized JSON of an `Account` obje
 
 * Make sure your `AccountSerializer` serializer is working
 
+******************************************************************************
 
 ## Chapter 03
 
@@ -1052,6 +1057,8 @@ The `Account` object returned should match the one you just created.
 
 * Register a new user at `http://localhost:8000/register` and confirm the `Account` object was created
 
+******************************************************************************
+
 ## Chapter 04
 
 ### Logging users in
@@ -1507,6 +1514,8 @@ Open `http://localhost:8000/login` in your browser and log in with the user you 
 
 * Log in with one of the users you created earlier by visiting `http://localhost:8000/login`
 
+******************************************************************************
+
 ## Chapter 05
 
 ### Logging users out
@@ -1714,6 +1723,8 @@ You can confirm the logout functionality is working by clicking the logout butto
 
 
 * Log out of your account by using the logout button in the navigation bar
+
+******************************************************************************
 
 ## Chapter 06
 
