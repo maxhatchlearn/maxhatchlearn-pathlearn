@@ -43,7 +43,7 @@ Ruby And JavaScript Coding Exercises
 | problem type | coding                                         
 |--------------|--------------------------------------------------------
 | name         | indexOf practice
-| statement    | use indexOf() to find the index of the number 4
+| statement    | use JavaScript's indexOf() to find the index of the number 4
 | explanation  | the first number has an index of 0
 | language     | JavaScript
 | start        | [1,2,3,4,5]
