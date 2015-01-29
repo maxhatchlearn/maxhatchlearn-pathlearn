@@ -3149,7 +3149,7 @@ To view your profile, direct your browser to `http://localhost:8000/+<username>`
 
 * Visit your profile page at `http://localhost:8000/+<username>`
 
-***************************************************
+******************************************************************************
 
 ## Chapter 10
 
@@ -3477,7 +3477,7 @@ Try updating your tagline. If it works, you will now see your tagline displayed 
 
 * Update your tagline and view the new tagline on your profile page
 
-*********************************************
+******************************************************************************
 
 ## Chapter 11
 
