@@ -1977,11 +1977,11 @@ At this point, feel free to open up your shell with `python manage.py shell` and
 
 We will confirm the views are working at the end of the next section.
 
-*************************************************
+******************************************************************************
 
 ## Chapter 07
 
-### Rendering Post objects
+### Rendering Post Objects
 
 Until now, the index page has been empty. Now that we have handled authentication and the backend details for the `Post` model, it's time to give our users something to interact with. We will do this by creating a service that handles retrieving and creating `Post`s and some controllers and directives for handling how the data is displayed.
 
