@@ -1,4 +1,4 @@
-Scala School
+Twitter Scala School
 ================================================================================
 
 ## About and Approach
