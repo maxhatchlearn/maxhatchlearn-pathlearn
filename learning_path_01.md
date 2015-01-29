@@ -48,7 +48,7 @@ Strings are how we represent text in Ruby. We need to protect the text from the 
 | statement    | One may also chain method invocations by simply adding more periods and method names sequentially - each method in the chain is called on the result of the previous method. Go on and try it by invoking next twice on 1 to get 3.
 | explanation  | The results you're looking at are the consequence of running a series of tests against your input to validate it. If you see results coloured red, this means one or more tests failed. Green means you're good to go.
 | language     | Ruby
-| start        | "1"
+| start        | 1
 | solution     | 1.next.next
 | output       | 3
 | description  | next called on 1 twice returns three
