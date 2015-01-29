@@ -1977,7 +1977,7 @@ At this point, feel free to open up your shell with `python manage.py shell` and
 
 We will confirm the views are working at the end of the next section.
 
-*****************************************************************
+*************************************************
 
 ## Chapter 07
 
@@ -2879,7 +2879,7 @@ Visit `http://localhost:8000/` and click the + button in the bottom-right corner
 
 * Create a new `Post` object via the interface you've just created
 
-*******************************************************************
+********************************************
 
 ## Chapter 09
 
@@ -3149,7 +3149,7 @@ To view your profile, direct your browser to `http://localhost:8000/+<username>`
 
 * Visit your profile page at `http://localhost:8000/+<username>`
 
-*******************************************************************
+***************************************************
 
 ## Chapter 10
 
@@ -3477,7 +3477,7 @@ Try updating your tagline. If it works, you will now see your tagline displayed 
 
 * Update your tagline and view the new tagline on your profile page
 
-*******************************************************************
+*********************************************
 
 ## Chapter 11
 
