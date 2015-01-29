@@ -9,11 +9,11 @@ Intro to Ruby
 
 Arrays store sequences of `objects`. There are a few ways to create an `array`:
 
-    empty_array = Array.new
-    another_empty_array = [] # this is the preferred way, and much easier!
+        empty_array = Array.new
+        another_empty_array = [] # this is the preferred way, and much easier!
 
-    some_squares = [4, 9, 16]
-    some_fruits = ["pear", "apple", "banana"]
+        some_squares = [4, 9, 16]
+        some_fruits = ["pear", "apple", "banana"]
 
 ![](pic.png)
 
@@ -23,10 +23,10 @@ Arrays store sequences of `objects`. There are a few ways to create an `array`:
 
 Strings are how we represent text in Ruby. We need to protect the text from the Ruby interpreter so it doesn't think our text is actually code:
 
-    > these are some words
-    NameError: undefined local variable or method 'words' for main:Object
-    from (irb):6
-    from /Users/maxplomer/.rvm/rubies/ruby-1.9.3-p194/bin/irb:16:in '<main>'
+        > these are some words
+        NameError: undefined local variable or method 'words' for main:Object
+        from (irb):6
+        from /Users/maxplomer/.rvm/rubies/ruby-1.9.3-p194/bin/irb:16:in '<main>'
 
 ********************************************************************************
 
