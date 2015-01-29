@@ -17,7 +17,7 @@ Make a function that takes two vectors as input and outputs the dot product. Sam
 | statement    | calc dot product
 | explanation  | calc dot product
 | language     | Ruby
-| start        | x = [1, 2, 3]<br>y = [10, 10, 10]<br>total = 0<br><br>total
+| start        | x = [1, 2, 3];y = [10, 10, 10];total = 0;total
 | solution     | 1.next.next
 | output       | 60
 | description  | calc dot product
