@@ -356,6 +356,7 @@ If everything went well, you should be able to access the various attributes of 
 ## Chapter 02
 
 ### Serializing the Account Model
+
 The AngularJS application we are going to build will make AJAX requests to the server to get the data it intends to display. Before we can send that data back to the client, we need to format it in a way that the client can understand; in this case, we choose JSON. The process of transforming Django models to JSON is called serialization and that is what we will talk about now.
 
 As the model we want to serialize is called `Account`, the serializer we will create is going to be called `AccountSerializer`.
@@ -1519,6 +1520,7 @@ Open `http://localhost:8000/login` in your browser and log in with the user you 
 ## Chapter 05
 
 ### Logging users out
+
 Given that users can register and login, we can assume they will want a way to log out. People get mad when they can't log out.
 
 **Making a logout API view**
@@ -1729,6 +1731,7 @@ You can confirm the logout functionality is working by clicking the logout butto
 ## Chapter 06
 
 ### Making a Post model
+
 In this section we will make a new app and create a `Post` model similar to a status on Facebook or a tweet on Twitter. After we create our model we will move on to serializing `Post`s and then we will create a few new endpoints for our API.
 
 **Making a posts app**
@@ -1974,3 +1977,1528 @@ At this point, feel free to open up your shell with `python manage.py shell` and
 
 We will confirm the views are working at the end of the next section.
 
+*****************************************************************
+
+## Chapter 07
+
+### Rendering Post objects
+
+Until now, the index page has been empty. Now that we have handled authentication and the backend details for the `Post` model, it's time to give our users something to interact with. We will do this by creating a service that handles retrieving and creating `Post`s and some controllers and directives for handling how the data is displayed.
+
+**A module for posts**
+
+Let's define the posts modules.
+
+Create a file in `static/javascripts/posts` called `posts.module.js` and add the following:
+
+    (function () {
+      'use strict';
+
+      angular
+        .module('thinkster.posts', [
+          'thinkster.posts.controllers',
+          'thinkster.posts.directives',
+          'thinkster.posts.services'
+        ]);
+
+      angular
+        .module('thinkster.posts.controllers', []);
+
+      angular
+        .module('thinkster.posts.directives', ['ngDialog']);
+
+      angular
+        .module('thinkster.posts.services', []);
+    })();
+
+
+* Define the `thinkster.posts` module
+
+Remember to add `thinkster.posts` as a dependency of `thinkster` in `thinkster.js`:
+
+    angular
+      .module('thinkster', [
+        'thinkster.config',
+        'thinkster.routes',
+        'thinkster.authentication',
+        'thinkster.layout',
+        'thinkster.posts'
+      ]);
+
+
+* Add `thinkster.posts` as a dependency of the `thinkster` module
+
+There are two things worth noting about this module.
+
+First, we have created a module named `thinkster.posts.directives`. As you probably guessed, this means we will introduce the concept of directives to our app in this chapter.
+
+Secondly, the `thinkster.posts.directives` module requires the `ngDialog` module. `ngDialog` is included in the boilerplate project and handles the display of modals. We will use a modal in the next chapter when we write the code for creating new posts.
+
+Include this file in `javascripts.html`:
+
+    <script type="text/javascript" src="{% static 'javascripts/posts/posts.module.js' %}"></script>
+
+
+* Include `posts.module.js` in `javascripts.html`
+
+**Making a Posts service**
+
+Before we can render anything, we need to transport data from the server to the client.
+
+Create a file at `static/javascripts/posts/services/` called `posts.service.js` and add the following:
+
+    /**
+    * Posts
+    * @namespace thinkster.posts.services
+    */
+    (function () {
+      'use strict';
+
+      angular
+        .module('thinkster.posts.services')
+        .factory('Posts', Posts);
+
+      Posts.$inject = ['$http'];
+
+      /**
+      * @namespace Posts
+      * @returns {Factory}
+      */
+      function Posts($http) {
+        var Posts = {
+          all: all,
+          create: create,
+          get: get
+        };
+
+        return Posts;
+
+        ////////////////////
+        
+        /**
+        * @name all
+        * @desc Get all Posts
+        * @returns {Promise}
+        * @memberOf thinkster.posts.services.Posts
+        */
+        function all() {
+          return $http.get('/api/v1/posts/');
+        }
+
+
+        /**
+        * @name create
+        * @desc Create a new Post
+        * @param {string} content The content of the new Post
+        * @returns {Promise}
+        * @memberOf thinkster.posts.services.Posts
+        */
+        function create(content) {
+          return $http.post('/api/v1/posts/', {
+            content: content
+          });
+        }
+
+        /**
+         * @name get
+         * @desc Get the Posts of a given user
+         * @param {string} username The username to get Posts for
+         * @returns {Promise}
+         * @memberOf thinkster.posts.services.Posts
+         */
+        function get(username) {
+          return $http.get('/api/v1/accounts/' + username + '/posts/');
+        }
+      }
+    })();
+
+
+* Make a new factory called `Posts` in `static/javascripts/posts/services/posts.service.js`
+
+Include this file in `javascripts.html`:
+
+    <script type="text/javascript" src="{% static 'javascripts/posts/services/posts.service.js' %}"></script>
+
+
+* Include `posts.service.js` in `javascripts.html`
+
+This code should look pretty familiar. It is very similar to the services we created before.
+
+The `Posts` service only has two methods: `all` and `create`.
+
+On the index page, we will use `Posts.all()` to get the list of objects we want to display. We will use `Posts.create()` to let users add their own posts.
+
+**Making an interface for the index page**
+
+Create `static/templates/layout/index.html` with the following contents:
+
+    <posts posts="vm.posts" ng-show="vm.posts && vm.posts.length"></posts>
+
+
+* Create the index template
+
+We will add a little more later, but not much. Most of what we need will be in the template we create for the posts directive next.
+
+**Making a Snackbar service**
+
+In the boilerplate project for this tutorial, we've included SnackbarJS. SnackbarJS is a small JavaScript library that makes showing snackbars (a concept from Google's Material Design) easy. Here, we will create a service to include this functionality in our AngularJS application.
+
+Open `static/javascripts/utils/services/snackbar.service.js` and add the following:
+
+    /**
+    * Snackbar
+    * @namespace thinkster.utils.services
+    */
+    (function ($, _) {
+      'use strict';
+
+      angular
+        .module('thinkster.utils.services')
+        .factory('Snackbar', Snackbar);
+
+      /**
+      * @namespace Snackbar
+      */
+      function Snackbar() {
+        /**
+        * @name Snackbar
+        * @desc The factory to be returned
+        */
+        var Snackbar = {
+          error: error,
+          show: show
+        };
+
+        return Snackbar;
+
+        ////////////////////
+        
+        /**
+        * @name _snackbar
+        * @desc Display a snackbar
+        * @param {string} content The content of the snackbar
+        * @param {Object} options Options for displaying the snackbar
+        */
+        function _snackbar(content, options) {
+          options = _.extend({ timeout: 3000 }, options);
+          options.content = content;
+
+          $.snackbar(options);
+        }
+
+
+        /**
+        * @name error
+        * @desc Display an error snackbar
+        * @param {string} content The content of the snackbar
+        * @param {Object} options Options for displaying the snackbar
+        * @memberOf thinkster.utils.services.Snackbar
+        */
+        function error(content, options) {
+          _snackbar('Error: ' + content, options);
+        }
+
+
+        /**
+        * @name show
+        * @desc Display a standard snackbar
+        * @param {string} content The content of the snackbar
+        * @param {Object} options Options for displaying the snackbar
+        * @memberOf thinkster.utils.services.Snackbar
+        */
+        function show(content, options) {
+          _snackbar(content, options);
+        }
+      }
+    })($, _);
+
+
+* Make a `Snackbar` service
+
+Don't forget to set up your modules. Open `static/javascripts/utils/utils.module.js` and add the following:
+
+    (function () {
+      'use strict';
+
+      angular
+        .module('thinkster.utils', [
+          'thinkster.utils.services'
+        ]);
+
+      angular
+        .module('thinkster.utils.services', []);
+    })();
+
+And make `thinksters.utils` a dependency of `thinkster` in `static/javascripts/thinkster.js`:
+
+    angular
+      .module('thinkster', [
+        // ...
+        'thinkster.utils',
+        // ...
+      ]);
+
+
+* Set up your modules for the `thinkster.utils` module
+
+
+* Make `thinkster.utils` a dependency of `thinkster`
+
+The last step for this service is to include the new JavaScript files in `javascripts.html`:
+
+    <script type="text/javascript" src="{% static 'javascripts/utils/utils.module.js' %}"></script>
+    <script type="text/javascript" src="{% static 'javascripts/utils/services/snackbar.service.js' %}"></script>
+
+
+* Include `utils.module.js` and `snackbar.service.js` in `javascripts.html`
+
+**Controlling the index interface with IndexController**
+
+Create a file in `static/javascripts/layout/controllers/` called `index.controller.js` and add the following:
+
+    /**
+    * IndexController
+    * @namespace thinkster.layout.controllers
+    */
+    (function () {
+      'use strict';
+
+      angular
+        .module('thinkster.layout.controllers')
+        .controller('IndexController', IndexController);
+
+      IndexController.$inject = ['$scope', 'Authentication', 'Posts', 'Snackbar'];
+
+      /**
+      * @namespace IndexController
+      */
+      function IndexController($scope, Authentication, Posts, Snackbar) {
+        var vm = this;
+
+        vm.isAuthenticated = Authentication.isAuthenticated();
+        vm.posts = [];
+
+        activate();
+
+        /**
+        * @name activate
+        * @desc Actions to be performed when this controller is instantiated
+        * @memberOf thinkster.layout.controllers.IndexController
+        */
+        function activate() {
+          Posts.all().then(postsSuccessFn, postsErrorFn);
+
+          $scope.$on('post.created', function (event, post) {
+            vm.posts.unshift(post);
+          });
+
+          $scope.$on('post.created.error', function () {
+            vm.posts.shift();
+          });
+
+
+          /**
+          * @name postsSuccessFn
+          * @desc Update posts array on view
+          */
+          function postsSuccessFn(data, status, headers, config) {
+            vm.posts = data.data;
+          }
+
+
+          /**
+          * @name postsErrorFn
+          * @desc Show snackbar with error
+          */
+          function postsErrorFn(data, status, headers, config) {
+            Snackbar.error(data.error);
+          }
+        }
+      }
+    })();
+
+
+* Make a new controller called `IndexController` in `static/javascripts/layout/controllers/index.controller.js`
+
+Include this file in `javascripts.html`:
+
+    <script type="text/javascript" src="{% static 'javascripts/layout/controllers/index.controller.js' %}"></script>
+
+
+* Include `index.controller.js` in `javascripts.html`
+
+Let's touch on a couple of things here.
+
+    $scope.$on('post.created', function (event, post) {
+      vm.posts.unshift(post);
+    });
+
+Later, when we get around to creating a new post, we will fire off an event called `post.created` when the user creates a post. By catching this event here, we can add this new post to the front of the `vm.posts` array. This will prevent us from having to make an extra API request to the server for updated data. We will talk about this more shortly, but for now you should know that we do this to increase the *perceived* performance of our application.
+
+    $scope.$on('post.created.error', function () {
+      vm.posts.shift();
+    });
+
+Analogous to the previous event listener, this one will remove the post at the front of `vm.posts` if the API request returns an error status code.
+
+**Making a route for the index page**
+
+With a controller and template in place, we need to set up a route for the index page.
+
+Open `static/javascripts/thinkster.routes.js` and add the following route:
+
+    .when('/', {
+      controller: 'IndexController',
+      controllerAs: 'vm',
+      templateUrl: '/static/templates/layout/index.html'
+    })
+
+
+* Add a route to `thinkster.routes.js` for the `/` path
+
+**Making a directive for displaying Posts**
+
+Create `static/javascripts/posts/directives/posts.directive.js` with the following contents:
+
+    /**
+    * Posts
+    * @namespace thinkster.posts.directives
+    */
+    (function () {
+      'use strict';
+
+      angular
+        .module('thinkster.posts.directives')
+        .directive('posts', posts);
+
+      /**
+      * @namespace Posts
+      */
+      function posts() {
+        /**
+        * @name directive
+        * @desc The directive to be returned
+        * @memberOf thinkster.posts.directives.Posts
+        */
+        var directive = {
+          controller: 'PostsController',
+          controllerAs: 'vm',
+          restrict: 'E',
+          scope: {
+            posts: '='
+          },
+          templateUrl: '/static/templates/posts/posts.html'
+        };
+
+        return directive;
+      }
+    })();
+
+
+* Make a new directive called `posts` in `static/javascripts/posts/directives/posts.directive.js`
+
+Include this file in `javascripts.html`:
+
+    <script type="text/javascript" src="{% static 'javascripts/posts/directives/posts.directive.js' %}"></script>
+
+
+* Include `posts.directive.js` in `javascripts.html`
+
+There are two parts of the directives API that I want to touch on: `scope` and `restrict`.
+
+    scope: {
+      posts: '='
+    },
+
+`scope` defines the scope of this directive, similar to how `$scope` works for controllers. The difference is that, in a controller, a new scope is implicitly created. For a directive, we have the option of explicitly defining our scopes and that's what we do here.
+
+The second line, `posts: '='` simply means that we want to set `$scope.posts` to the value passed in through the `posts` attribute in the template that we made earlier.
+
+    restrict: 'E',
+
+`restrict` tells Angular how we are allowed to use this directive. In our case, we set the value of `restrict` to `E` (for element) which means Angular should only match the name of our directive with the name of an element: `<posts></posts>`. 
+
+Another common option is `A` (for attribute), which tells Angular to only match the name of the directive with the name of an attribute. `ngDialog` uses this option, as we will see shortly.
+
+**Controller the posts directive with PostsController**
+
+The directive we just created requires a controller called `PostsController`. 
+
+Create `static/javascripts/posts/controllers/posts.controller.js` with the following content:
+
+    /**
+    * PostsController
+    * @namespace thinkster.posts.controllers
+    */
+    (function () {
+      'use strict';
+
+      angular
+        .module('thinkster.posts.controllers')
+        .controller('PostsController', PostsController);
+
+      PostsController.$inject = ['$scope'];
+
+      /**
+      * @namespace PostsController
+      */
+      function PostsController($scope) {
+        var vm = this;
+
+        vm.columns = [];
+
+        activate();
+
+
+        /**
+        * @name activate
+        * @desc Actions to be performed when this controller is instantiated
+        * @memberOf thinkster.posts.controllers.PostsController
+        */
+        function activate() {
+          $scope.$watchCollection(function () { return $scope.posts; }, render);
+          $scope.$watch(function () { return $(window).width(); }, render);
+        }
+        
+
+        /**
+        * @name calculateNumberOfColumns
+        * @desc Calculate number of columns based on screen width
+        * @returns {Number} The number of columns containing Posts
+        * @memberOf thinkster.posts.controllers.PostsControllers
+        */
+        function calculateNumberOfColumns() {
+          var width = $(window).width();
+
+          if (width >= 1200) {
+            return 4;
+          } else if (width >= 992) {
+            return 3;
+          } else if (width >= 768) {
+            return 2;
+          } else {
+            return 1;
+          }
+        }
+
+
+        /**
+        * @name approximateShortestColumn
+        * @desc An algorithm for approximating which column is shortest
+        * @returns The index of the shortest column
+        * @memberOf thinkster.posts.controllers.PostsController
+        */
+        function approximateShortestColumn() {
+          var scores = vm.columns.map(columnMapFn);
+
+          return scores.indexOf(Math.min.apply(this, scores));
+
+          
+          /**
+          * @name columnMapFn
+          * @desc A map function for scoring column heights
+          * @returns The approximately normalized height of a given column
+          */
+          function columnMapFn(column) {
+            var lengths = column.map(function (element) {
+              return element.content.length;
+            });
+
+            return lengths.reduce(sum, 0) * column.length;
+          }
+
+
+          /**
+          * @name sum
+          * @desc Sums two numbers
+          * @params {Number} m The first number to be summed
+          * @params {Number} n The second number to be summed
+          * @returns The sum of two numbers
+          */
+          function sum(m, n) {
+            return m + n;
+          }
+        }
+
+
+        /**
+        * @name render
+        * @desc Renders Posts into columns of approximately equal height
+        * @param {Array} current The current value of `vm.posts`
+        * @param {Array} original The value of `vm.posts` before it was updated
+        * @memberOf thinkster.posts.controllers.PostsController
+        */
+        function render(current, original) {
+          if (current !== original) {
+            vm.columns = [];
+
+            for (var i = 0; i < calculateNumberOfColumns(); ++i) {
+              vm.columns.push([]);
+            }
+
+            for (var i = 0; i < current.length; ++i) {
+              var column = approximateShortestColumn();
+
+              vm.columns[column].push(current[i]);
+            }
+          }
+        }
+      }
+    })();
+
+
+* Make a new controller called `PostsController` in `static/javascripts/posts/controllers/posts.controller.js`
+
+Include this file in `javascripts.html`:
+
+    <script type="text/javascript" src="{% static 'javascripts/posts/controllers/posts.controller.js' %}"></script>
+
+
+* Include `posts.controller.js` in `javascripts.html`
+
+It isn't worth taking the time to step through this controller line-by-line. Suffice it to say that this controller presents an algorithm for ensuring the columns of posts are of approximately equal height.
+
+The only thing worth mentioning here is this line:
+
+    $scope.$watchCollection(function () { return $scope.posts; }, render);
+
+Because we do not have direct access to the ViewModel that `posts` is stored on, we watch `$scope.posts` instead of `vm.posts`. Furthermore, we use `$watchCollection` here because `$scope.posts` is an array. `$watch` watches the object's reference, not it's actual value. `$watchCollection` watches the value of an array from changes. If we used `$watch` here instead of `$watchCollection`, the changes caused by `$scope.posts.shift()` and `$scope.posts.unshift()` would not trigger the watcher.
+
+**Making a template for the posts directive**
+
+In our directive we defined a `templateUrl` that doesn't match any of our existing templates. Let's go ahead and make a new one.
+
+Create `static/templates/posts/posts.html` with the following content:
+
+    <div class="row" ng-cloak>
+      <div ng-repeat="column in vm.columns">
+        <div class="col-xs-12 col-sm-6 col-md-4 col-lg-3">
+          <div ng-repeat="post in column">
+            <post post="post"></post>
+          </div>
+        </div>
+      </div>
+
+      <div ng-hide="vm.columns && vm.columns.length">
+        <div class="col-sm-12 no-posts-here">
+          <em>The are no posts here.</em>
+        </div>
+      </div>
+    </div>
+
+
+* Create a template for the `posts` directive
+
+A few things worth noting:
+
+1. We use the `ng-cloak` directive to prevent flashing since this directive will be used on the first page loaded.
+2. We will need to create a `post` directive for rendering each individual post.
+3. If no posts are present, we render a message informing the user.
+
+**Making a directive for displaying a single Post**
+
+In the template for the posts directive, we use another directive called `post`. Let's create that.
+
+Create `static/javascripts/posts/directives/post.directive.js` with the following content:
+
+    /**
+    * Post
+    * @namespace thinkster.posts.directives
+    */
+    (function () {
+      'use strict';
+
+      angular
+        .module('thinkster.posts.directives')
+        .directive('post', post);
+
+      /**
+      * @namespace Post
+      */
+      function post() {
+        /**
+        * @name directive
+        * @desc The directive to be returned
+        * @memberOf thinkster.posts.directives.Post
+        */
+        var directive = {
+          restrict: 'E',
+          scope: {
+            post: '='
+          },
+          templateUrl: '/static/templates/posts/post.html'
+        };
+
+        return directive;
+      }
+    })();
+
+
+* Make a new directive called `post` in `static/javascripts/posts/directives/post.directive.js`
+
+Include this file in `javascripts.html`:
+
+    <script type="text/javascript" src="{% static 'javascripts/posts/directives/post.directive.js' %}"></script>
+
+
+* Include `post.directive.js` in `javascripts.html`
+
+There is nothing new worth discussing here. This directive is almost identical to the previous one. The only difference is we use a different template.
+
+**Making a template for the post directive**
+
+Like we did for the `posts` directive, we now need to make a template for the `post` directive.
+
+Create `static/templates/posts/post.html` with the following content:
+
+    <div class="row">
+      <div class="col-sm-12">
+        <div class="well">
+          <div class="post">
+            <div class="post__meta">
+              <a href="/+{{ post.author.username }}">
+                +{{ post.author.username }}
+              </a>
+            </div>
+
+            <div class="post__content">
+              {{ post.content }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+* Create a template for the `post` directive
+
+**Some quick CSS**
+
+We want to add a few simple styles to make our posts look better. Open `static/stylesheets/styles.css` and add the following:
+
+    .no-posts-here {
+      text-align: center;
+    }
+
+    .post {}
+
+    .post .post__meta {
+      font-weight: bold;
+      text-align: right;
+      padding-bottom: 19px;
+    }
+
+    .post .post__meta a:hover {
+      text-decoration: none;
+    }
+
+
+* Add some CSS to `static/stylesheets/style.css` to make our posts look better
+
+**Checkpoint**
+
+Assuming all is well, you can confirm you're on the right track by loading `http://localhost:8000/` in your browser. You should see the `Post` object you created at the end of the last section!
+
+This also confirms that `PostViewSet` from the last section is working.
+
+
+* Visit `http://localhost:8000/` and confirm the `Post` object you made earlier is shown.
+
+************************************************************
+
+## Chapter 08
+
+### Making new posts
+
+Given that we already have the necessary endpoints in place, the next thing we need to let users make new posts is an interface. We accomplish this by adding a button to the bottom-right corner of the screen. When this button is clicked, a modal shows up asking the user to type in their post.
+
+We only want this button to show up on the index page for now, so open `static/templates/layout/index.html` and add the following snippet to the bottom of the file:
+
+    <a class="btn btn-primary btn-fab btn-raised mdi-content-add btn-add-new-post"
+      href="javascript:void(0)"
+      ng-show="vm.isAuthenticated"
+      ng-dialog="/static/templates/posts/new-post.html"
+      ng-dialog-controller="NewPostController as vm"></a>
+
+The anchor tag in this snippet uses the `ngDialog` directive we included as a dependency earlier to show a modal when the user wants to submit a new post.
+
+Because we want the button to be fixed to the bottom-right corner of the screen, we also need to add a new CSS rule.
+
+Open `static/stylesheets/styles.css` and add this rule to the bottom of the file:
+
+    .btn-add-new-post {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+    }
+
+
+* Add a button for showing the new post modal
+
+
+* Style the new post button
+
+**An interface for submitting new posts**
+
+Now we need to create the form the user will type their new post into. Open `static/templates/posts/new-post.html` and add the following to the bottom of the file:
+
+    <form role="form" ng-submit="vm.submit()">
+      <div class="form-group">
+        <label for="post__content">New Post</label>
+        <textarea class="form-control" 
+                  id="post__content" 
+                  rows="3" 
+                  placeholder="ex. This is my first time posting on Not Google Plus!" 
+                  ng-model="vm.content">
+        </textarea>
+      </div>
+
+      <div class="form-group">
+        <button type="submit" class="btn btn-primary">
+          Submit
+        </button>
+      </div>
+    </form>
+
+
+* Make a template for adding new posts in `static/templates/posts/new-post.html`
+
+**Controlling the new post interface with NewPostController**
+
+Create `static/javascripts/posts/controller/new-post.controller.js` with the following content:
+
+    /**
+    * NewPostController
+    * @namespace thinkster.posts.controllers
+    */
+    (function () {
+      'use strict';
+
+      angular
+        .module('thinkster.posts.controllers')
+        .controller('NewPostController', NewPostController);
+
+      NewPostController.$inject = ['$rootScope', '$scope', 'Authentication', 'Snackbar', 'Posts'];
+
+      /**
+      * @namespace NewPostController
+      */
+      function NewPostController($rootScope, $scope, Authentication, Snackbar, Posts) {
+        var vm = this;
+
+        vm.submit = submit;
+
+        /**
+        * @name submit
+        * @desc Create a new Post
+        * @memberOf thinkster.posts.controllers.NewPostController
+        */
+        function submit() {
+          $rootScope.$broadcast('post.created', {
+            content: vm.content,
+            author: {
+              username: Authentication.getAuthenticatedAccount().username
+            }
+          });
+
+          $scope.closeThisDialog();
+
+          Posts.create(vm.content).then(createPostSuccessFn, createPostErrorFn);
+
+
+          /**
+          * @name createPostSuccessFn
+          * @desc Show snackbar with success message
+          */
+          function createPostSuccessFn(data, status, headers, config) {
+            Snackbar.show('Success! Post created.');
+          }
+
+          
+          /**
+          * @name createPostErrorFn
+          * @desc Propogate error event and show snackbar with error message
+          */
+          function createPostErrorFn(data, status, headers, config) {
+            $rootScope.$broadcast('post.created.error');
+            Snackbar.error(data.error);
+          }
+        }
+      }
+    })();
+
+
+* Make a `NewPostController` in `static/javascripts/posts/controllers/new-post.controller.js`
+
+There are a few things going on here that we should talk about.
+
+    $rootScope.$broadcast('post.created', {
+      content: $scope.content,
+      author: {
+        username: Authentication.getAuthenticatedAccount().username
+      }
+    });
+
+Earlier we set up an event listener in `IndexController` that listened for the `post.created` event and then pushed the new post onto the front of `vm.posts`. Let's look at this a little more closely, as this turns out to be an important feature of rich web applications.
+
+What we are doing here is being *optimistic* that the API response from `Posts.create()` will contain a 200 status code telling us everything went according to plan. This may seem like a bad idea at first. Something could go wrong during the request and then our data is stale. Why don't we just wait for the response?
+
+When I said we are increasing the *perceived* performance of our app, this is what I was talking about. We want the user to *perceive* the response as instant.
+
+The fact of the matter is that this call will rarely fail. There are only two cases where this will reasonably fail: either the user is not authenticated or the server is down.
+
+In the case where the user is not authenticated, they shouldn't be submitting new posts anyways. Consider the error to be a small punishment for the user doing things they shouldn't.
+
+If the server is down, then there is nothing we can do. Unless the user already had the page loaded before the server crashed, they wouldn't be able to see this page anyways.
+
+Other things that could possibly go wrong make up such a small percentage that we are willing to allow a slightly worse experience to make the experience better for the 99.9% of cases where everything is working properly.
+
+Furthermore, the object we pass as the second argument is meant to emulate the response from the server. This is not the best design pattern because it assumes we know what the response will look like. If the response changes, we have to update this code. However, given what we have, this is an acceptable cost.
+
+So what happens when the API call returns an error?
+
+    $rootScope.$broadcast('post.created.error');
+
+If the error callback is triggered, then we will broadcast a new event: `post.created.error`. The event listener we set up earlier will be trigger by this event and remove the post at the front of `vm.posts`. We will also show the error message to the user to let them know what happened.
+
+    $scope.closeThisDialog();
+
+This is a method provided by `ngDialog`. All it does is close the model we have open. It's also worth nothing that `closeThisDialog()` is not stored on the ViewModel, so we must call `$scope.closeThisDialog()` instead of `vm.closeThisDialog()`.
+
+Be sure to include `new-post.controller.js` in `javascripts.html`:
+
+    <script type="text/javascript" src="{% static 'javascripts/posts/controllers/new-post.controller.js' %}"></script>
+
+
+* Include `new-post.controller.js` in `javascripts.html`
+
+**Checkpoint**
+
+Visit `http://localhost:8000/` and click the + button in the bottom-right corner. Fill out this form to create a new post. You will know everything worked because the new post will be displayed at the top of the page.
+
+
+* Create a new `Post` object via the interface you've just created
+
+*******************************************************************
+
+## Chapter 09
+
+### Displaying user profiles
+
+We already have the Django views and routes necessary to display a profile for each user. From here we can jump into making an AngularJS service and then move on to the template and controllers.
+
+    In this section and the next, we will refer to accounts as profiles. For the purposes of our client, that is effectively what the `Account` model translates into: a user's profile.
+
+
+**Making the profile modules**
+
+We will be creating a service and a couple of controllers relating to user profiles, so let's go ahead and define the modules we will need.
+
+Create `static/javascripts/profiles/profiles.module.js` with the following content:
+
+    (function () {
+      'use strict';
+
+      angular
+        .module('thinkster.profiles', [
+          'thinkster.profiles.controllers',
+          'thinkster.profiles.services'
+        ]);
+
+      angular
+        .module('thinkster.profiles.controllers', []);
+
+      angular
+        .module('thinkster.profiles.services', []);
+    })();
+
+
+* Define the modules needed for profiles in `profiles.module.js`
+
+As always, don't forget to register `thinkster.profiles` as a dependency of `thinkster` in `thinkster.js`:
+
+    angular
+      .module('thinkster', [
+        'thinkster.config',
+        'thinkster.routes',
+        'thinkster.authentication',
+        'thinkster.layout',
+        'thinkster.posts',
+        'thinkster.profiles'
+      ]);
+
+
+* Register `thinkster.profiles` as a dependency of the `thinkster` module
+
+Include this file in `javascripts.html`:
+
+    <script type="text/javascript" src="{% static 'javascripts/profiles/profiles.module.js' %}"></script>
+
+**Making a Profile factory**
+
+With the module definitions in place, we are ready to create the `Profile` service that will communicate with our API.
+
+Create `static/javascripts/profiles/services/profile.service.js` with the following contents:
+
+    /**
+    * Profile
+    * @namespace thinkster.profiles.services
+    */
+    (function () {
+      'use strict';
+
+      angular
+        .module('thinkster.profiles.services')
+        .factory('Profile', Profile);
+
+      Profile.$inject = ['$http'];
+
+      /**
+      * @namespace Profile
+      */
+      function Profile($http) {
+        /**
+        * @name Profile
+        * @desc The factory to be returned
+        * @memberOf thinkster.profiles.services.Profile
+        */
+        var Profile = {
+          destroy: destroy,
+          get: get,
+          update: update
+        };
+
+        return Profile;
+
+        /////////////////////
+
+        /**
+        * @name destroy
+        * @desc Destroys the given profile
+        * @param {Object} profile The profile to be destroyed
+        * @returns {Promise}
+        * @memberOf thinkster.profiles.services.Profile
+        */
+        function destroy(profile) {
+          return $http.delete('/api/v1/accounts/' + profile.id + '/');
+        }
+
+
+        /**
+        * @name get
+        * @desc Gets the profile for user with username `username`
+        * @param {string} username The username of the user to fetch
+        * @returns {Promise}
+        * @memberOf thinkster.profiles.services.Profile
+        */
+        function get(username) {
+          return $http.get('/api/v1/accounts/' + username + '/');
+        }
+
+
+        /**
+        * @name update
+        * @desc Update the given profile
+        * @param {Object} profile The profile to be updated
+        * @returns {Promise}
+        * @memberOf thinkster.profiles.services.Profile
+        */
+        function update(profile) {
+          return $http.put('/api/v1/accounts/' + profile.username + '/', profile);
+        }
+      }
+    })();
+
+
+* Create a new factory called `Profiles` in `static/javascripts/profiles/services/profiles.service.js`
+
+We aren't doing anything special here. Each of these API calls is a basic CRUD operation, so we get away with not having much code.
+
+Add this file to `javascripts.html`:
+
+    <script type="text/javascript" src="{% static 'javascripts/profiles/services/profile.service.js' %}"></script>
+
+
+* Include `profiles.service.js` in `javascripts.html`
+
+**Making an interface for user profiles**
+
+Create `static/templates/profiles/profile.html` with the following content:
+
+    <div class="profile" ng-show="vm.profile">
+      <div class="jumbotron profile__header">
+        <h1 class="profile__username">+{{ vm.profile.username }}</h1>
+        <p class="profile__tagline">{{ vm.profile.tagline }}</p>
+      </div>
+
+      <posts posts="vm.posts"></posts>
+    </div>
+
+
+* Make a template for displaying profiles in `static/templates/profiles/profile.html`
+
+This will render a header with the username and tagline of the profile owner, followed by a list of their posts. The posts are rendered using the directive we created earlier for the index page.
+
+**Controlling the profile interface with ProfileController**
+
+The next step is to create the controller that will use the service we just created, along with the `Post` service, to retrieve the data we want to display.
+
+Create `static/javascripts/profiles/controllers/profile.controller.js` with the following content:
+
+    /**
+    * ProfileController
+    * @namespace thinkster.profiles.controllers
+    */
+    (function () {
+      'use strict';
+
+      angular
+        .module('thinkster.profiles.controllers')
+        .controller('ProfileController', ProfileController);
+
+      ProfileController.$inject = ['$location', '$routeParams', 'Posts', 'Profile', 'Snackbar'];
+
+      /**
+      * @namespace ProfileController
+      */
+      function ProfileController($location, $routeParams, Posts, Profile, Snackbar) {
+        var vm = this;
+
+        vm.profile = undefined;
+        vm.posts = [];
+
+        activate();
+
+        /**
+        * @name activate
+        * @desc Actions to be performed when this controller is instantiated
+        * @memberOf thinkster.profiles.controllers.ProfileController
+        */
+        function activate() {
+          var username = $routeParams.username.substr(1);
+
+          Profile.get(username).then(profileSuccessFn, profileErrorFn);
+          Posts.get(username).then(postsSuccessFn, postsErrorFn);
+
+          /**
+          * @name profileSuccessProfile
+          * @desc Update `profile` on viewmodel
+          */
+          function profileSuccessFn(data, status, headers, config) {
+            vm.profile = data.data;
+          }
+
+
+          /**
+          * @name profileErrorFn
+          * @desc Redirect to index and show error Snackbar
+          */
+          function profileErrorFn(data, status, headers, config) {
+            $location.url('/');
+            Snackbar.error('That user does not exist.');
+          }
+
+
+          /**
+            * @name postsSucessFn
+            * @desc Update `posts` on viewmodel
+            */
+          function postsSuccessFn(data, status, headers, config) {
+            vm.posts = data.data;
+          }
+
+
+          /**
+            * @name postsErrorFn
+            * @desc Show error snackbar
+            */
+          function postsErrorFn(data, status, headers, config) {
+            Snackbar.error(data.data.error);
+          }
+        }
+      }
+    })();
+
+
+* Create a new controller called `ProfileController` in `static/javascripts/profiles/controllers/profile.controller.js`
+
+Include this file in `javascripts.html`:
+
+    <script type="text/javascript" src="{% static 'javascripts/profiles/controllers/profile.controller.js' %}"></script>
+
+
+* Include `profile.controller.js` in `javascripts.html`
+
+**Making a route for viewing user profiles**
+
+Open `static/javascripts/thinkster.routes.js` and add the following route:
+
+    .when('/+:username', {
+      controller: 'ProfileController',
+      controllerAs: 'vm',
+      templateUrl: '/static/templates/profiles/profile.html'
+    })
+
+
+* Make a route for viewing user profiles
+
+**Checkpoint**
+
+To view your profile, direct your browser to `http://localhost:8000/+<username>`. If the page renders, everything is good!
+
+
+* Visit your profile page at `http://localhost:8000/+<username>`
+
+*******************************************************************
+
+## Chapter 10
+
+### Updating user profiles
+
+The last feature we will implement in this tutorial is the ability for a user to update their profile. The updates we offer will be minimal, including updating the user's first name, last name, email, and tagline, but you will get the gist of it and can add more options at will.
+
+**ProfileSettingsController**
+
+To get started, open `static/javascripts/profiles/controllers/profile-settings.controller.js` and add the following contents:
+
+    /**
+    * ProfileSettingsController
+    * @namespace thinkster.profiles.controllers
+    */
+    (function () {
+      'use strict';
+
+      angular
+        .module('thinkster.profiles.controllers')
+        .controller('ProfileSettingsController', ProfileSettingsController);
+
+      ProfileSettingsController.$inject = [
+        '$location', '$routeParams', 'Authentication', 'Profile', 'Snackbar'
+      ];
+
+      /**
+      * @namespace ProfileSettingsController
+      */
+      function ProfileSettingsController($location, $routeParams, Authentication, Profile, Snackbar) {
+        var vm = this;
+
+        vm.destroy = destroy;
+        vm.update = update;
+
+        activate();
+
+
+        /**
+        * @name activate
+        * @desc Actions to be performed when this controller is instantiated.
+        * @memberOf thinkster.profiles.controllers.ProfileSettingsController
+        */
+        function activate() {
+          var authenticatedAccount = Authentication.getAuthenticatedAccount();
+          var username = $routeParams.username.substr(1);
+
+          // Redirect if not logged in
+          if (!authenticatedAccount) {
+            $location.url('/');
+            Snackbar.error('You are not authorized to view this page.');
+          } else {
+            // Redirect if logged in, but not the owner of this profile.
+            if (authenticatedAccount.username !== username) {
+              $location.url('/');
+              Snackbar.error('You are not authorized to view this page.');
+            }
+          }
+
+          Profile.get(username).then(profileSuccessFn, profileErrorFn);
+
+          /**
+          * @name profileSuccessFn
+          * @desc Update `profile` for view
+          */
+          function profileSuccessFn(data, status, headers, config) {
+            vm.profile = data.data;
+          }
+
+          /**
+          * @name profileErrorFn
+          * @desc Redirect to index
+          */
+          function profileErrorFn(data, status, headers, config) {
+            $location.url('/');
+            Snackbar.error('That user does not exist.');
+          }
+        }
+
+
+        /**
+        * @name destroy
+        * @desc Destroy this user's profile
+        * @memberOf thinkster.profiles.controllers.ProfileSettingsController
+        */
+        function destroy() {
+          Profile.destroy(vm.profile.username).then(profileSuccessFn, profileErrorFn);
+
+          /**
+          * @name profileSuccessFn
+          * @desc Redirect to index and display success snackbar
+          */
+          function profileSuccessFn(data, status, headers, config) {
+            Authentication.unauthenticate();
+            window.location = '/';
+
+            Snackbar.show('Your account has been deleted.');
+          }
+
+
+          /**
+          * @name profileErrorFn
+          * @desc Display error snackbar
+          */
+          function profileErrorFn(data, status, headers, config) {
+            Snackbar.error(data.error);
+          }
+        }
+
+
+        /**
+        * @name update
+        * @desc Update this user's profile
+        * @memberOf thinkster.profiles.controllers.ProfileSettingsController
+        */
+        function update() {
+          Profile.update(vm.profile).then(profileSuccessFn, profileErrorFn);
+
+          /**
+          * @name profileSuccessFn
+          * @desc Show success snackbar
+          */
+          function profileSuccessFn(data, status, headers, config) {
+            Snackbar.show('Your profile has been updated.');
+          }
+
+
+          /**
+          * @name profileErrorFn
+          * @desc Show error snackbar
+          */
+          function profileErrorFn(data, status, headers, config) {
+            Snackbar.error(data.error);
+          }
+        }
+      }
+    })();
+
+
+* Create the `ProfileSettingsController` controller
+
+Be sure to include this file in `javascripts.html`:
+
+    <script type="text/javascript" src="{% static 'javascripts/profiles/controllers/profile-settings.controller.js' %}"></script>
+
+
+* Include `profile-settings.controller.js` in `javascripts.html`
+
+Here we have created two methods that will be available to the view: `update` and `destroy`. As their names suggest, `update` will allow the user to update their profile and `destroy` will destroy the user's account.
+
+Most of this controller should look familiar, but let's go over the methods we've created for clarity.
+
+    /**
+     * @name activate
+     * @desc Actions to be performed when this controller is instantiated.
+     * @memberOf thinkster.profiles.controllers.ProfileSettingsController
+     */
+    function activate() {
+      var authenticatedAccount = Authentication.getAuthenticatedAccount();
+      var username = $routeParams.username.substr(1);
+
+      // Redirect if not logged in
+      if (!authenticatedAccount) {
+        $location.url('/');
+        Snackbar.error('You are not authorized to view this page.');
+      } else {
+        // Redirect if logged in, but not the owner of this profile.
+        if (authenticatedAccount.username !== username) {
+          $location.url('/');
+          Snackbar.error('You are not authorized to view this page.');
+        }
+      }
+
+      Profile.get(username).then(profileSuccessFn, profileErrorFn);
+
+      /**
+       * @name profileSuccessFn
+       * @desc Update `profile` for view
+       */
+      function profileSuccessFn(data, status, headers, config) {
+        vm.profile = data.data;
+      }
+
+      /**
+       * @name profileErrorFn
+       * @desc Redirec to index
+       */
+      function profileErrorFn(data, status, headers, config) {
+        $location.url('/');
+        Snackbar.error('That user does not exist.');
+      }
+    }
+
+
+In `activate`, we follow a familiar pattern. Because this page allows for dangerous operations to be performed, we must make sure the current user is authorized to see this page. We do this by first checking if the user is authenticated and then checking if the authenticated user owns the profile. If either case is false, then we redirect to the index page with a snackbar error stating that the user is not authorized to view this page.
+
+If the authorization process succeeds, we simply grab the user's profile from the server and allow the user to do as they wish.
+
+    /**
+     * @name destroy
+     * @desc Destroy this user's profile
+     * @memberOf thinkster.profiles.controllers.ProfileSettingsController
+     */
+    function destroy() {
+      Profile.destroy(vm.profile).then(profileSuccessFn, profileErrorFn);
+
+      /**
+       * @name profileSuccessFn
+       * @desc Redirect to index and display success snackbar
+       */
+      function profileSuccessFn(data, status, headers, config) {
+        Authentication.unauthenticate();
+        window.location = '/';
+
+        Snackbar.show('Your account has been deleted.');
+      }
+
+
+      /**
+       * @name profileErrorFn
+       * @desc Display error snackbar
+       */
+      function profileErrorFn(data, status, headers, config) {
+        Snackbar.error(data.error);
+      }
+    }
+
+When a user wishes to destroy their profile, we must unauthenticate them and redirect to the index page, performing a page refresh in the process. This will make the navigation bar re-render with the logged out view.
+
+If for some reason destroying the user's profile returns an error status code, we simply display an error snackbar with the error message returned by the server. We do not perform any other actions because we see no reason why this call should fail unless the user is not authorized to delete this profile, but we have already accounted for this scenario in the `activate` method.
+
+    /**
+     * @name update
+     * @desc Update this user's profile
+     * @memberOf thinkster.profiles.controllers.ProfileSettingsController
+     */
+    function update() {
+      Profile.update(vm.profile).then(profileSuccessFn, profileErrorFn);
+
+      /**
+       * @name profileSuccessFn
+       * @desc Show success snackbar
+       */
+      function profileSuccessFn(data, status, headers, config) {
+        Snackbar.show('Your profile has been updated.');
+      }
+
+
+      /**
+       * @name profileErrorFn
+       * @desc Show error snackbar
+       */
+      function profileErrorFn(data, status, headers, config) {
+        Snackbar.error(data.error);
+      }
+    }
+
+`update()` is very simple. Whether the call succeeds or fails, we show a snackbar with the appropriate message.
+
+**A template for the settings page**
+
+As usual, now that we have the controller we need to make a corresponding template.
+
+Create `static/templates/profiles/settings.html` with the following content:
+
+    <div class="col-md-4 col-md-offset-4">
+      <div class="well" ng-show="vm.profile">
+        <form role="form" class="settings" ng-submit="vm.update()">
+          <div class="form-group">
+            <label for="settings__email">Email</label>
+            <input type="text" class="form-control" id="settings__email" ng-model="vm.profile.email" placeholder="ex. john@example.com" />
+          </div>
+
+          <div class="form-group">
+            <label for="settings__password">New Password</label>
+            <input type="password" class="form-control" id="settings__password" ng-model="vm.profile.password" placeholder="ex. notgoogleplus" />
+          </div>
+
+          <div class="form-group">
+            <label for="settings__confirm-password">Confirm Password</label>
+            <input type="password" class="form-control" id="settings__confirm-password" ng-model="vm.profile.confirm_password" placeholder="ex. notgoogleplus" />
+          </div>
+
+          <div class="form-group">
+            <label for="settings__username">Username</label>
+            <input type="text" class="form-control" id="settings__username" ng-model="vm.profile.username" placeholder="ex. notgoogleplus" />
+          </div>
+
+          <div class="form-group">
+            <label for="settings__tagline">Tagline</label>
+            <textarea class="form-control" id="settings__tagline" ng-model="vm.profile.tagline" placeholder="ex. This is Not Google Plus." />
+          </div>
+
+          <div class="form-group">
+            <button type="submit" class="btn btn-primary">Submit</button>
+            <button type="button" class="btn btn-danger pull-right" ng-click="vm.destroy()">Delete Account</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+
+* Create a template for `ProfileSettingsController`
+
+This template is similar to the forms we created for registering and logging in. There is nothing here worth discussing. 
+
+**Profile settings route**
+
+Open up `static/javascripts/thinkster.routes.js` and add the following route:
+
+    // ...
+    .when('/+:username/settings', {
+      controller: 'ProfileSettingsController',
+      controllerAs: 'vm',
+      templateUrl: '/static/templates/profiles/settings.html'
+    })
+    // ...
+
+**Checkpoint**
+
+And that's our last feature! You should now be able to load up the settings page at `http://localhost:8000/+:username/settings` and update your settings as you wish.
+
+Try updating your tagline. If it works, you will now see your tagline displayed on your profile page.
+
+
+* Update your tagline and view the new tagline on your profile page
+
+*******************************************************************
+
+## Chapter 11
+
+### Congratulations, you did it!
+
+During this tutorial you accomplished a lot. 
+
+For starters, you build an entire authentication system by yourself! You extended Django's built-in `User` model and added various attributes and did so in a way that makes adding other information an easy feat when it becomes necessary. You went on to built both the front and back ends for registration, logging in, logging out, and updating the user's profile.
+
+In addition to building the authentication system you also create a way for users to add their posts to our application and view other users' posts.
+
+This is the stuff that we do as engineers of the web. There will be times when you will need skills learned outside this tutorial and there are certainly best practices that we did not touch on, but what you've done here is the gist of web development!
+
+Be proud of what you've accomplished here and tell you friends by [tweeting about it](https://twitter.com/intent/tweet?text=I%20just%20built%20a%20Google%20Plus%20clone%20with%20%23django%20and%20%23angularjs!&url=http%3A%2F%2Fthinkster.io%2F&via=gothinkster). We hope that you enjoyed this tutorial and will come back when you want to learn more. As always, our inbox is open to your comments, suggestions, and feedback.
+
+Happy hacking!
+
+**Contributors**
+
+Before you go, I want to give a shoutout to all of the people who were kind enough to send us emails and pull requests.
+
+Here is a full list of contributors who helped with the current release:
+
+Albert Pai, Christophe Blefari, Diego Martinez, Eric Simons, Ernest Ezis, Iulian Gulea, James Brewer, Lorenzo Cinque, Martin Hill, Martin Oosthuizen, Matt Greene, Ronald Paloschi, Seth Clossman, Vladimir Vitvitskiy, Zach Reinhardt
