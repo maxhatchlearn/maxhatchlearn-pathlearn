@@ -1562,7 +1562,7 @@ Open up `thinkster_django_angular_boilerplate/urls.py` again and add the followi
 
     Create an API endpoint for `LogoutView`
 
-** Logout: AngularJS Service**
+**Logout: AngularJS Service**
 
 The final method you need to add to your `Authentication` service is the `logout()` method.
 
@@ -1612,7 +1612,7 @@ As always, remember to expose `logout` as part of the `Authentication` service:
 
     Add a `logout()` method to your `Authentication` service
 
-** Controlling the navigation bar with NavbarController**
+**Controlling the navigation bar with NavbarController**
 
 There will not actually be a `LogoutController` or `logout.html`. Instead, the navigation bar already contains a logout link for authenticated users. We will create a `NavbarController` for handling the logout buttons `onclick` functionality and we will update the link itself with an `ng-click` attribute.
 
@@ -1664,7 +1664,7 @@ While you have `templates/navbar.html` open, go ahead and find the logout link a
 
     Update `navbar.html` to include the `ng-controller` and `ng-click` directives where appropriate
 
-** Layout modules**
+**Layout modules**
 
 We need to add a few new modules this time around.
 
@@ -1696,7 +1696,7 @@ And don't forget to update `static/javascripts/thinkster.js` also:
 
     Define new `thinkster.layout` and `thinkster.layout.controllers` modules
 
-** Including new .js files**
+**Including new .js files**
 
 This time around there are a couple new JavaScript files to include. Open up `javascripts.html` and add the following:
 
@@ -1706,7 +1706,7 @@ This time around there are a couple new JavaScript files to include. Open up `ja
 
     Include new JavaScript files in `javascripts.html`
 
-** Checkpoint**
+**Checkpoint**
 
 If you visit `http://localhost:8000/` in your browser, you should still be logged in. If not, you will need to log in again.
 
@@ -1736,7 +1736,7 @@ Remember: whenever you create a new app you have to add it to the `INSTALLED_APP
         'posts',
     )
 
-** Making the Post model**
+**Making the Post model**
 
 After you create the `posts` app Django made a new file called `posts/models.py`. Go ahead and open it up and add the following:
 
@@ -1776,7 +1776,7 @@ Now that the model exists, don't forget to migrate.
 
     Make migrations for `Post` and apply them
 
-** Serializing the Post model**
+**Serializing the Post model**
 
 Create a new file in `posts/` called `serializers.py` and add the following:
 
@@ -1820,7 +1820,7 @@ We pass `read_only=True` because we should not be updating an `Account` object w
 
 For the same reason we use `required=False`, we must also add `author` to the list of validations we wish to skip.
 
-** Making API views for Post objects**
+**Making API views for Post objects**
 
 The next step in creating `Post` objects is adding an API endpoint that will handle performing actions on the `Post` model such as create or update.
 
@@ -1894,7 +1894,7 @@ This viewset will be used to list the posts associated with a specific `Account`
 
 Here we filter our queryset based on the author's username. The `account_username` argument will be supplied by the router we will create in a few minutes.
 
-** Making the IsAuthorOfPost permission**
+**Making the IsAuthorOfPost permission**
 
 Create `permissions.py` in the `posts/` directory with the following content:
 
@@ -1912,7 +1912,7 @@ Create `permissions.py` in the `posts/` directory with the following content:
 
 We will skip the explanation for this. This permission is almost identical to the one we made previously.
 
-** Making an API endpoint for posts**
+**Making an API endpoint for posts**
 
 With the views created, it's time to add the endpoints to our API.
 
@@ -1946,7 +1946,7 @@ Now add these lines just above `urlpatterns = patterns(`:
 
     Make an API endpoint for the `AccountPostsViewSet` viewset
 
-** Checkpoint**
+**Checkpoint**
 
 At this point, feel free to open up your shell with `python manage.py shell` and play around with creating and serializing `Post` objects.
 
