@@ -105,7 +105,7 @@ Make a new app called `authentication` by running the following command:
     $ python manage.py startapp authentication
 
 
-######Make a Django app named `authentication`
+* Make a Django app named `authentication`
 
 
 **Creating the Account model**
@@ -145,7 +145,7 @@ Open `authentication/models.py` in your favorite text editor and edit it to refl
             return self.first_name
 
 
-######Make a new model in `authentication/models.py` called `Account`
+* Make a new model in `authentication/models.py` called `Account`
 
 Let's take a closer look at each attribute and method in turn.
 
@@ -314,7 +314,7 @@ When you're ready, generate the migrations for the `authentication` app and appl
 
 
 
-######Generate the migrations for the `authentication` app and apply them
+* Generate the migrations for the `authentication` app and apply them
 
 **Making yourself a superuser**
 
@@ -327,7 +327,7 @@ After running the command, Django will prompt you for some information and creat
     $ python manage.py createsuperuser
 
 
-######Make a new super user `Account`
+* Make a new super user `Account`
 
 **Checkpoint**
 
@@ -347,7 +347,7 @@ If everything went well, you should be able to access the various attributes of 
     >>> a.username
 
 
-######Access the `Account` object you just created
+* Access the `Account` object you just created
 
 ## Chapter 02
 
@@ -367,7 +367,7 @@ Before we write our serializers, let's create a `serializers.py` file inside our
     $ touch authentication/serializers.py
 
 
-######Create a `serializers.py` file inside the `authentication` app
+* Create a `serializers.py` file inside the `authentication` app
 
 Open `authentication/serializers.py` and add the following code and imports:
 
@@ -410,7 +410,7 @@ Open `authentication/serializers.py` and add the following code and imports:
 		return instance
 
 
-######Make a serializer called `AccountSerializer` in `authentication/serializers.py`
+* Make a serializer called `AccountSerializer` in `authentication/serializers.py`
 
 
     From here on, we will declare imports that are used in each snippet. These may already be present in the file. If so, they do not need to be added a second time.
@@ -471,9 +471,9 @@ Before updating the user's password, we need to confirm they have provided value
 After we verify that the password should be updated, we much use `Account.set_password()` to perform the update. `Account.set_password()` takes care of storing passwords in a secure way. It is important to note that we must explicitly save the model after updating the password.
 
 
-######This is a naive implementation of how to validate a password. I would not recommend using this in a real-world system, but for our purposes this does nicely.
+* This is a naive implementation of how to validate a password. I would not recommend using this in a real-world system, but for our purposes this does nicely.
 
-######update_session_auth_hash(self.context.get('request'), instance)
+* update_session_auth_hash(self.context.get('request'), instance)
 
 When a user's password is updated, their session authentication hash must be explicitly updated. If we don't do this here, the user will not be authenticated on their next request and will have to log in again.
 
@@ -488,7 +488,7 @@ By now we should have no problem seeing the serialized JSON of an `Account` obje
     >>> serialized_account.data.get('username')
 
 
-######Make sure your `AccountSerializer` serializer is working
+* Make sure your `AccountSerializer` serializer is working
 
 
 ## Chapter 03
@@ -540,7 +540,7 @@ Open `authentication/views.py` and replace it's contents with the following code
 
 
 
-######Make a viewset called `AccountViewSet` in `authentication/views.py`
+* Make a viewset called `AccountViewSet` in `authentication/views.py`
 
 Let's step through this snippet line-by-line:
 
@@ -615,7 +615,7 @@ Create a file called `authentication/permissions.py` with the following content:
             return False
 
 
-######Make a permission called `IsAccountOwner` in `authentication/permissions.py`
+* Make a permission called `IsAccountOwner` in `authentication/permissions.py`
 
 This is a pretty basic permission. If there is a user associated with the current request, we check whether that user is the same object as `account`. If there is no user associated with this request, we simply return `False`.
 
@@ -701,7 +701,7 @@ Make a file in `static/javascripts/authentication/services/` called `authenticat
     })();
 
 
-######Make a factory called `Authentication` in `static/javascripts/authentication/services/authentication.service.js`
+* Make a factory called `Authentication` in `static/javascripts/authentication/services/authentication.service.js`
 
 Let's step through this line-by-line:
 
@@ -769,7 +769,7 @@ Let's begin creating the interface users will use to register. Begin by creating
     </div>
 
 
-######Create a `register.html` template
+* Create a `register.html` template
 
 We won't go into much detail this time because this is pretty basic HTML. A lot of the classes come from Bootstrap, which is included by the boilerplate project. There are only two lines that we are going to pay attention to:
 
@@ -820,7 +820,7 @@ Create a file in `static/javascripts/authentication/controllers/` called `regist
 
 
 
-######Make a controller named `RegisterController` in `static/javascripts/authentication/controllers/register.controller.js`
+* Make a controller named `RegisterController` in `static/javascripts/authentication/controllers/register.controller.js`
 
 As usual, we will skip over the familiar and talk about new concepts.
 
@@ -919,7 +919,7 @@ Create a file in `static/javascripts/authentication/` called `authentication.mod
     })();
 
 
-######Define the `thinkster.authentication` module and it's dependencies
+* Define the `thinkster.authentication` module and it's dependencies
 
 There are a couple of interesting syntaxes to note here.
 
@@ -954,7 +954,7 @@ Open `static/javascripts/thinkster.js`, define the required modules, and include
     })();
 
 
-######Update the `thinkster` module to include it's new dependencies
+* Update the `thinkster` module to include it's new dependencies
 
 **Hash routing**
 By default, Angular uses a feature called hash routing. If you've ever seen a URL that looks like `www.google.com/#/search` then you know what I'm talking about. Again, this is personal preference, but I think those are incredibly ugly. To get rid of hash routing, we can enabled `$locationProvider.html5Mode`. In older browsers that do not support HTML5 routing, Angular will intelligently fall back to hash routing.
@@ -982,7 +982,7 @@ Create a file in `static/javascripts/` called `thinkster.config.js` and give it 
 
 
 
-######Enable HTML5 routing for AngularJS
+* Enable HTML5 routing for AngularJS
 
 As mentioned, enabling `$locationProvider.html5Mode` gets rid of the hash sign in the URL. The other setting here, `$locationProvider.hashPrefix`, turns the `#` into a `#!`. This is mostly for the benefit of search engines.
 
@@ -998,7 +998,7 @@ Because we are using a new module here, we need to open up `static/javascripts/t
       .module('thinkster.config', []);
 
 
-######Define the `thinkster.config` module
+* Define the `thinkster.config` module
 
 **Include new .js files**
 In this chapter so far, we have already created a number of new JavaScript files. We need to include these in the client by adding them to `templates/javascripts.html` inside the `{% compress js %}` block.
@@ -1012,7 +1012,7 @@ Open `templates/javascripts.html` and add the following above the `{% endcompres
     <script type="text/javascript" src="{% static 'javascripts/authentication/controllers/register.controller.js' %}"></script>
 
 
-######Add the new JavaScript files to `templates/javascripts.html`
+* Add the new JavaScript files to `templates/javascripts.html`
 
 **Handling CSRF protection**
 Because we are using session-based authentication, we have to worry about CSRF protection. We don't go into detail on CSRF here because it's outside the scope of this tutorial, but suffice it to say that CSRF is very bad.
@@ -1037,7 +1037,7 @@ Open up `static/javascripts/thinkster.js` and add the following under your modul
     }
 
 
-######Configure AngularJS CSRF settings
+* Configure AngularJS CSRF settings
 
 **Checkpoint**
 Try registering a new user by running your server (`python manage.py runserver`), visiting `http://localhost:8000/register` in your browser and filling out the form.
@@ -1050,7 +1050,7 @@ If the registration worked, you can view the new `Account` object created by ope
 The `Account` object returned should match the one you just created.
 
 
-######Register a new user at `http://localhost:8000/register` and confirm the `Account` object was created
+* Register a new user at `http://localhost:8000/register` and confirm the `Account` object was created
 
 ## Chapter 04
 
@@ -1099,7 +1099,7 @@ Open up `authentication/views.py` and add the following:
                 }, status=status.HTTP_401_UNAUTHORIZED)
 
 
-######Make a view called `LoginView` in `authentication/views.py`
+* Make a view called `LoginView` in `authentication/views.py`
 
 This is a longer snippet than we've seen in the past, but we will approach it the same way: by talking about what's new and ignoring what we have already encountered.
 
@@ -1160,7 +1160,7 @@ Open up `thinkster_django_angular_boilerplate/urls.py` and add the following URL
     )
 
 
-######Add an API endpoint for `LoginView`
+* Add an API endpoint for `LoginView`
 
 **Authentication Service**
 
@@ -1190,7 +1190,7 @@ Make sure to expose it as part of the service:
     };
 
 
-######Add a `login` method to your `Authentication` service
+* Add a `login` method to your `Authentication` service
 
 Much like the `register()` method from before, `login()` returns makes an AJAX request to our API and returns a promise.
 
@@ -1270,7 +1270,7 @@ Again, don't forget to expose these methods as part of the service:
 
 
 
-######Add `getAuthenticatedAccount`, `isAuthenticated`, `setAuthenticatedAccount`, and `unauthenticate` methods to your `Authentication` service
+* Add `getAuthenticatedAccount`, `isAuthenticated`, `setAuthenticatedAccount`, and `unauthenticate` methods to your `Authentication` service
 
 Before we move on to the login interface, let's quickly update the `login` method of the `Authentication` service to use one of these new utility methods. Replace `Authentication.login` with the following:
 
@@ -1308,7 +1308,7 @@ Before we move on to the login interface, let's quickly update the `login` metho
 
 
 
-######Update `Authentication.login` to use our new utility methods
+* Update `Authentication.login` to use our new utility methods
 
 **Making a login interface**
 We now have `Authentication.login()` to log a user in, so let's create the login form. Open up `static/templates/authentication/login.html` and add the following HTML:
@@ -1340,7 +1340,7 @@ We now have `Authentication.login()` to log a user in, so let's create the login
     </div>
 
 
-######Create a `login.html` template
+* Create a `login.html` template
 
 **Controlling the login interface with LoginController**
 
@@ -1393,7 +1393,7 @@ Create a file in `static/javascripts/authentication/controllers/` called `login.
     })();
 
 
-######Make a controller called `LoginController` in `static/javascripts/authentication/controllers/login.controller.js`
+* Make a controller called `LoginController` in `static/javascripts/authentication/controllers/login.controller.js`
 
 Let's look at the `activate` function.
 
@@ -1428,7 +1428,7 @@ Open `static/javascripts/authentication/controllers/register.controller.js` and 
     }
 
 
-######Redirect authenticated users to the index view in `RegisterController`
+* Redirect authenticated users to the index view in `RegisterController`
 
 If you remember, we also talked about logging a user in automatically when they register. Since we are already updating registration related content, let's update the `register` method in the `Authentication` service.
 
@@ -1468,7 +1468,7 @@ Replace `Authentication.register` when the following:
     }
 
 
-######Update `Authentication.register`
+* Update `Authentication.register`
 
 **Making a route for the login interface**
 
@@ -1498,14 +1498,14 @@ If you can believe it, we've only created one new JavaScript file since the last
     <script type="text/javascript" src="{% static 'javascripts/authentication/controllers/login.controller.js' %}"></script>
 
 
-######Include `login.controller.js` in `javascripts.html`
+* Include `login.controller.js` in `javascripts.html`
 
 **Checkpoint**
 
 Open `http://localhost:8000/login` in your browser and log in with the user you created earlier. If this works, the page should redirect to `http://localhost:8000/` and the navigation bar should change.
 
 
-######Log in with one of the users you created earlier by visiting `http://localhost:8000/login`
+* Log in with one of the users you created earlier by visiting `http://localhost:8000/login`
 
 ## Chapter 05
 
@@ -1531,7 +1531,7 @@ Open up `authentication/views.py` and add the following imports and class:
             return Response({}, status=status.HTTP_204_NO_CONTENT)
 
 
-######Make a view called `LogoutView` in `authentication/views.py`
+* Make a view called `LogoutView` in `authentication/views.py`
 
 There are only a few new things to talk about this time.
 
@@ -1560,7 +1560,7 @@ Open up `thinkster_django_angular_boilerplate/urls.py` again and add the followi
     )
 
 
-######Create an API endpoint for `LogoutView`
+* Create an API endpoint for `LogoutView`
 
 **Logout: AngularJS Service**
 
@@ -1610,7 +1610,7 @@ As always, remember to expose `logout` as part of the `Authentication` service:
     };
 
 
-######Add a `logout()` method to your `Authentication` service
+* Add a `logout()` method to your `Authentication` service
 
 **Controlling the navigation bar with NavbarController**
 
@@ -1651,7 +1651,7 @@ Create a file in `static/javascripts/layout/controllers/` called `navbar.control
     })();
 
 
-######Create a `NavbarController` in `static/javascripts/layout/controllers/navbar.controller.js`
+* Create a `NavbarController` in `static/javascripts/layout/controllers/navbar.controller.js`
 
 Open `templates/navbar.html` and add an `ng-controller` directive with the value `NavbarController as vm` to the `<nav />` tag like so:
 
@@ -1662,7 +1662,7 @@ While you have `templates/navbar.html` open, go ahead and find the logout link a
     <li><a href="javascript:void(0)" ng-click="vm.logout()">Logout</a></li>
 
 
-######Update `navbar.html` to include the `ng-controller` and `ng-click` directives where appropriate
+* Update `navbar.html` to include the `ng-controller` and `ng-click` directives where appropriate
 
 **Layout modules**
 
@@ -1694,7 +1694,7 @@ And don't forget to update `static/javascripts/thinkster.js` also:
       ]);
 
 
-######Define new `thinkster.layout` and `thinkster.layout.controllers` modules
+* Define new `thinkster.layout` and `thinkster.layout.controllers` modules
 
 **Including new .js files**
 
@@ -1704,7 +1704,7 @@ This time around there are a couple new JavaScript files to include. Open up `ja
     <script type="text/javascript" src="{% static 'javascripts/layout/controllers/navbar.controller.js' %}"></script>
 
 
-######Include new JavaScript files in `javascripts.html`
+* Include new JavaScript files in `javascripts.html`
 
 **Checkpoint**
 
@@ -1713,7 +1713,7 @@ If you visit `http://localhost:8000/` in your browser, you should still be logge
 You can confirm the logout functionality is working by clicking the logout button in the navigation bar. This should refresh the page and update the navigation bar to it's logged out view.
 
 
-######Log out of your account by using the logout button in the navigation bar
+* Log out of your account by using the logout button in the navigation bar
 
 ## Chapter 06
 
@@ -1727,7 +1727,7 @@ First things first: go ahead and create a new app called `posts`.
     $ python manage.py startapp posts
 
 
-######Make a new app named `posts`
+* Make a new app named `posts`
 
 Remember: whenever you create a new app you have to add it to the `INSTALLED_APPS` setting. Open `thinkster_django_angular_boilerplate/settings.py` and modify it like so:
 
@@ -1756,7 +1756,7 @@ from authentication.models import Account
             return '{0}'.format(self.content)
 
 
-######Make a new model called `Post` in `posts/models.py`
+* Make a new model called `Post` in `posts/models.py`
 
 Our method of walking through the code line-by-line is working well so far. Why mess with a good thing? Let's do it.
 
@@ -1774,7 +1774,7 @@ Now that the model exists, don't forget to migrate.
     $ python manage.py migrate
 
 
-######Make migrations for `Post` and apply them
+* Make migrations for `Post` and apply them
 
 **Serializing the Post model**
 
@@ -1801,7 +1801,7 @@ Create a new file in `posts/` called `serializers.py` and add the following:
             return exclusions + ['author']
 
 
-######Make a new serializer called `PostSerializer` in `posts/serializers.py`
+* Make a new serializer called `PostSerializer` in `posts/serializers.py`
 
 There isn't much here that's new, but there is one line in particular I want to look at.
 
@@ -1861,10 +1861,10 @@ Replace the contents of `posts/views.py` with the following:
             return Response(serializer.data)
 
 
-######Make a `PostViewSet` viewset
+* Make a `PostViewSet` viewset
 
 
-######Make an `AccountPostsViewSet` viewset
+* Make an `AccountPostsViewSet` viewset
 
 Do these views look similar? They aren't that different than the ones we made to create `User` objects.
 
@@ -1908,7 +1908,7 @@ Create `permissions.py` in the `posts/` directory with the following content:
             return False
 
 
-######Make a new permission called `IsAuthenticatedAndOwnsObject` in `posts/permissions.py`
+* Make a new permission called `IsAuthenticatedAndOwnsObject` in `posts/permissions.py`
 
 We will skip the explanation for this. This permission is almost identical to the one we made previously.
 
@@ -1941,10 +1941,10 @@ Now add these lines just above `urlpatterns = patterns(`:
     )
 
 
-######Make an API endpoint for the `PostViewSet` viewset
+* Make an API endpoint for the `PostViewSet` viewset
 
 
-######Make an API endpoint for the `AccountPostsViewSet` viewset
+* Make an API endpoint for the `AccountPostsViewSet` viewset
 
 **Checkpoint**
 
