@@ -491,4 +491,1475 @@ By now we should have no problem seeing the serialized JSON of an `Account` obje
     Make sure your `AccountSerializer` serializer is working
 
 
+## Chapter 03
+
+### Registering new users
+
+At this point we have the models and serializers needed to represent users. Now we need to build an authentication system. This involves creating the various views and interfaces for registering, logging in and logging out. We will also touch on an `Authentication` service with AngularJS and a few different controllers.
+
+Because we can't log in users that don't exist, it makes sense to start with registration. 
+
+To register a user, we need an API endpoint that will create an `Account` object, an AngularJS service to make an AJAX request to the API and a registration form. Let's make the API endpoint first.
+
+**Making the account API viewset**
+
+Open `authentication/views.py` and replace it's contents with the following code:
+
+    from rest_framework import permissions, viewsets
+
+    from authentication.models import Account
+    from authentication.permissions import IsAccountOwner
+    from authentication.serializers import AccountSerializer
+
+
+    class AccountViewSet(viewsets.ModelViewSet):
+        lookup_field = 'username'
+        queryset = Account.objects.all()
+        serializer_class = AccountSerializer
+
+        def get_permissions(self):
+            if self.request.method in permissions.SAFE_METHODS:
+                return (permissions.AllowAny(),)
+
+            if self.request.method == 'POST':
+                return (permissions.AllowAny(),)
+
+            return (permissions.IsAuthenticated(), IsAccountOwner(),)
+
+	def create(self, request):
+		serializer = self.serializer_class(data=request.data)
+
+		if serializer.is_valid():
+		Account.objects.create_user(**serializer.validated_data)
+
+		return Response(serializer.validated_data, status=status.HTTP_201_CREATED)
+		return Response({
+		'status': 'Bad request',
+		'message': 'Account could not be created with received data.'
+		}, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+    Make a viewset called `AccountViewSet` in `authentication/views.py`
+
+Let's step through this snippet line-by-line:
+
+    class AccountViewSet(viewsets.ModelViewSet):
+
+Django REST Framework offers a feature called viewsets. A viewset, as the name implies, is a set of views. Specifically, the `ModelViewSet` offers an interface for listing, creating, retrieving, updating and destroying objects of a given model.
+
+    lookup_field = 'username'
+    queryset = Account.objects.all()
+    serializer_class = AccountSerializer
+
+Here we define the query set and the serialzier that the viewset will operate on. Django REST Framework uses the specified queryset and serializer to perform the actions listed above. Also note that we specify the `lookup_field` attribute. As mentioned earlier, we will use the `username` attribute of the `Account` model to look up accounts instead of the `id` attribute. Overriding `lookup_field` handles this for us.
+
+    def get_permissions(self):
+        if self.request.method in permissions.SAFE_METHODS:
+            return (permissions.AllowAny(),)
+        
+        if self.request.method == 'POST':
+            return (permissions.AllowAny(),)
+
+        return (permissions.IsAuthenticated(), IsAccountOwner(),)
+
+The only user that should be able to call dangerous methods (such as `update()` and `delete()`) is the owner of the account. We first check if the user is authenticated and then call a custom permission that we will write in just a moment. This case does not hold when the HTTP method is `POST`. We want to allow any user to create an account.
+
+If the HTTP method of the request ('GET', 'POST', etc) is "safe", then anyone can use that endpoint.
+
+    def create(self, request):
+        serializer = self.serializer_class(data=request.data)
+
+        if serializer.is_valid():
+            Account.objects.create_user(**serializer.validated_data)
+
+            return Response(serializer.validated_data, status=status.HTTP_201_CREATED)
+        return Response({
+            'status': 'Bad request',
+            'message': 'Account could not be created with received data.'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+
+    def create(self, request):
+        serializer = self.serializer_class(data=request.DATA)
+
+        if serializer.is_valid():
+            account = Account.objects.create_user(**request.DATA)
+
+            account.set_password(request.DATA.get('password'))
+            account.save()
+
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response({
+            'status': 'Bad request',
+            'message': 'Account could not be created with received data.'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+When you create an object using the serializer's `.save()` method, the object's attributes are set literally. This means that a user registering with the password `'password'` will have their password stored as `'password'`. This is bad for a couple of reasons: 1) Storing passwords in plain text is a massive security issue. 2) Django hashes and salts passwords before comparing them, so the user wouldn't be able to log in using `'password'` as their password.
+
+We solve this problem by overriding the `.create()` method for this viewset and using `Account.objects.create_user()` to create the `Account` object.
+
+**Making the IsAccountOwner permission**
+
+Let's create the `IsAccountOwner()` permission from the view we just made.
+
+Create a file called `authentication/permissions.py` with the following content:
+
+    from rest_framework import permissions
+
+
+    class IsAccountOwner(permissions.BasePermission):
+        def has_object_permission(self, request, view, account):
+            if request.user:
+                return account == request.user
+            return False
+
+
+    Make a permission called `IsAccountOwner` in `authentication/permissions.py`
+
+This is a pretty basic permission. If there is a user associated with the current request, we check whether that user is the same object as `account`. If there is no user associated with this request, we simply return `False`.
+
+**Adding an API endpoint**
+Now that we have created the view, we need to add it to the URLs file. Open `thinkster_django_angular_boilerplate/urls.py` and update it to look like so:
+
+    # .. Imports
+    from rest_framework_nested import routers
+
+    from authentication.views import AccountViewSet
+
+    router = routers.SimpleRouter()
+    router.register(r'accounts', AccountViewSet)
+
+    urlpatterns = patterns(
+         '',
+        # ... URLs
+        url(r'^api/v1/', include(router.urls)),
+
+        url('^.*$', IndexView.as_view(), name='index'),
+    )
+
+
+    Add an API endpoint for `AccountViewSet`
+
+    It is very important that the last URL in the above snippet always be the last URL. This is known as a passthrough or catch-all route. It accepts all requests not matched by a previous rule and passes the request through to AngularJS's router for processing. The order of other URLS is normally insignificant.
+
+**An Angular service for registering new users**
+
+With the API endpoint in place, we can create an AngularJS service that will handle communication between the client and the server.
+
+Make a file in `static/javascripts/authentication/services/` called `authentication.service.js` and add the following code:
+
+    Feel free to leave the comments out of your own code. It takes a lot of time to type them all out!
+
+    /**
+    * Authentication
+    * @namespace thinkster.authentication.services
+    */
+    (function () {
+      'use strict';
+
+      angular
+        .module('thinkster.authentication.services')
+        .factory('Authentication', Authentication);
+
+      Authentication.$inject = ['$cookies', '$http'];
+
+      /**
+      * @namespace Authentication
+      * @returns {Factory}
+      */
+      function Authentication($cookies, $http) {
+        /**
+        * @name Authentication
+        * @desc The Factory to be returned
+        */
+        var Authentication = {
+          register: register
+        };
+
+        return Authentication;
+
+        ////////////////////
+
+        /**
+        * @name register
+        * @desc Try to register a new user
+        * @param {string} username The username entered by the user
+        * @param {string} password The password entered by the user
+        * @param {string} email The email entered by the user
+        * @returns {Promise}
+        * @memberOf thinkster.authentication.services.Authentication
+        */
+        function register(email, password, username) {
+          return $http.post('/api/v1/accounts/', {
+            username: username,
+            password: password,
+            email: email
+          });
+        }
+      }
+    })();
+
+
+    Make a factory called `Authentication` in `static/javascripts/authentication/services/authentication.service.js`
+
+Let's step through this line-by-line:
+
+    angular
+      .module('thinkster.authentication.services')
+
+AngularJS supports the use of modules. Modularization is a great feature because it promotes encapsulation and loose coupling. We make thorough use of Angular's module system throughout the tutorial. For now, all you need to know is that this service is in the `thinkster.authentication.services` module.
+
+    .factory('Authentication', Authentication);
+
+This line registers a factory named `Authentication` on the module from the previous line. 
+
+    function Authentication($cookies, $http) {
+
+Here we define the factory we just registered. We inject the `$cookies` and `$http` services as a dependency. We will be using `$cookies` later.
+
+    var Authentication = {
+      register: register
+    };
+
+This is personal preference, but I find it's more readable to define your service as a named object and then return it, leaving the details lower in the file. 
+
+    function register (username, password, email) {
+
+At this point, the `Authentication` service has only one method: `register`, which takes a `username`, `password`, and `email`. We will add more methods to the service as we move forward.
+ 
+    return $http.post('/api/v1/accounts/', {
+      username: username,
+      password: password,
+      email: email
+    });
+
+As mentioned before, we need to make an AJAX request to the API endpoint we made. As data, we include the `username`, `password` and `email` parameters this method received. We have no reason to do anything special with the response, so we will let the caller of `Authentication.register` handle the callback.
+
+**Making an interface for registering new users**
+Let's begin creating the interface users will use to register. Begin by creating a file in `static/templates/authentication/` called `register.html` with the following content: 
+
+    <div class="row">
+      <div class="col-md-4 col-md-offset-4">
+        <h1>Register</h1>
+
+        <div class="well">
+          <form role="form" ng-submit="vm.register()">
+            <div class="form-group">
+              <label for="register__email">Email</label>
+              <input type="email" class="form-control" id="register__email" ng-model="vm.email" placeholder="ex. john@notgoogle.com" />
+            </div>
+
+            <div class="form-group">
+              <label for="register__username">Username</label>
+              <input type="text" class="form-control" id="register__username" ng-model="vm.username" placeholder="ex. john" />
+            </div>
+
+            <div class="form-group">
+              <label for="register__password">Password</label>
+              <input type="password" class="form-control" id="register__password" ng-model="vm.password" placeholder="ex. thisisnotgoogleplus" />
+            </div>
+
+            <div class="form-group">
+              <button type="submit" class="btn btn-primary">Submit</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+
+    Create a `register.html` template
+
+We won't go into much detail this time because this is pretty basic HTML. A lot of the classes come from Bootstrap, which is included by the boilerplate project. There are only two lines that we are going to pay attention to:
+
+    <form role="form" ng-submit="vm.register()">
+
+This is the line responsible for calling `$scope.register`, which we set up in our controller. `ng-submit` will call `vm.register` when the form is submitted. If you have used Angular before, you are probably used to using `$scope`. In this tutorial, we choose to avoid using `$scope` where possible in favor of `vm` for ViewModel. See the [Controllers](https://github.com/johnpapa/angularjs-styleguide#controllers) section of John Papa's AngularJS Style Guide for more on this.
+
+    <input type="email" class="form-control" id="register__email" ng-model="vm.email" placeholder="ex. john@notgoogle.com" />
+
+On each `<input />`, you will see another directive, `ng-model`. `ng-model` is responsible for storing the value of the input on the ViewModel. This is how we get the username, password, and email when `vm.register` is called.
+
+**Controlling the interface with RegisterController**
+With a service and interface in place, we need a controller to hook the two together. The controller we create, `RegisterController` will allow us to call the `register` method of the `Authentication` service when a user submits the form we've just built.
+
+Create a file in `static/javascripts/authentication/controllers/` called `register.controller.js` and add the following:
+
+    /**
+    * Register controller
+    * @namespace thinkster.authentication.controllers
+    */
+    (function () {
+      'use strict';
+
+      angular
+        .module('thinkster.authentication.controllers')
+        .controller('RegisterController', RegisterController);
+
+      RegisterController.$inject = ['$location', '$scope', 'Authentication'];
+
+      /**
+      * @namespace RegisterController
+      */
+      function RegisterController($location, $scope, Authentication) {
+        var vm = this;
+
+        vm.register = register;
+
+        /**
+        * @name register
+        * @desc Register a new user
+        * @memberOf thinkster.authentication.controllers.RegisterController
+        */
+        function register() {
+          Authentication.register(vm.email, vm.password, vm.username);
+        }
+      }
+    })();
+
+
+
+    Make a controller named `RegisterController` in `static/javascripts/authentication/controllers/register.controller.js`
+
+As usual, we will skip over the familiar and talk about new concepts.
+
+    .controller('RegisterController', RegisterController);
+
+This is similar to the way we registered our service. The difference is that, this time, we are registering a controller.
+
+    vm.register = register;
+
+`vm` allows the template we just created to access the `register` method we define later in the controller.
+
+    Authentication.register(vm.email, vm.password, vm.username);
+
+Here we call the service we created a few minutes ago. We pass in a username, password and email from `vm`. 
+
+**Registration Routes and Modules**
+
+Let's set up some client-side routing so users of the app can navigate to the register form.
+
+Create a file in `static/javascripts` called `thinkster.routes.js` and add the following:
+
+    (function () {
+      'use strict';
+
+      angular
+        .module('thinkster.routes')
+        .config(config);
+
+      config.$inject = ['$routeProvider'];
+
+      /**
+      * @name config
+      * @desc Define valid application routes
+      */
+      function config($routeProvider) {
+        $routeProvider.when('/register', {
+          controller: 'RegisterController', 
+          controllerAs: 'vm',
+          templateUrl: '/static/templates/authentication/register.html'
+        }).otherwise('/');
+      }
+    })();
+
+
+
+    Define a route for the registration form
+
+There are a few points we should touch on here.
+
+    .config(config);
+
+Angular, like just about any framework you can imagine, allows you to edit it's configuration. You do this with a `.config` block. 
+
+    function config($routeProvider) {
+
+Here, we are injecting `$routeProvider` as a dependency, which will let us add routing to the client.
+
+    $routeProvider.when('/register', {
+
+`$routeProvider.when` takes two arguments: a path and an options object. Here we use `/register` as the path because thats where we want the registration form to show up.
+
+    controller: 'RegisterController',
+    controllerAs: 'vm',
+
+One key you can include in the options object is `controller`. This will map a certain controller to this route. Here we use the `RegisterController` controller we made earlier. `controllerAs` is another option. This is required to use the `vm` variable. In short, we are saying that we want to refer to the controller as `vm` in the template.
+
+    templateUrl: '/static/templates/authentication/register.html'
+
+The other key we will use is `templateUrl`. `templateUrl` takes a string of the URL where the template we want to use for this route can be found.
+
+    }).otherwise('/');
+
+We will add more routes as we move forward, but it's possible a user will enter a URL that we don't support. When this happens, `$routeProvider.otherwise` will redirect the user to the path specified; in this case, '/'.
+
+**Setting up AngularJS modules**
+Let us quickly discuss modules in AngularJS.
+
+In Angular, you must define modules prior to using them. So far we need to define `thinkster.authentication.services`, `thinkster.authentication.controllers`, and `thinkster.routes`. Because `thinkster.authentication.services` and `thinkster.authentication.controllers` are submodules of `thinkster.authentication`, we need to create a `thinkster.authentication` module as well.
+
+Create a file in `static/javascripts/authentication/` called `authentication.module.js` and add the following:
+
+    (function () {
+      'use strict';
+
+      angular
+        .module('thinkster.authentication', [
+          'thinkster.authentication.controllers',
+          'thinkster.authentication.services'
+        ]);
+
+      angular
+        .module('thinkster.authentication.controllers', []);
+
+      angular
+        .module('thinkster.authentication.services', ['ngCookies']);
+    })();
+
+
+    Define the `thinkster.authentication` module and it's dependencies
+
+There are a couple of interesting syntaxes to note here.
+
+    angular
+      .module('thinkster.authentication', [
+        'thinkster.authentication.controllers',
+        'thinkster.authentication.services'
+      ]);
+
+This syntax defines the module `thinkster.authentication` with `thinkster.authentication.controllers` and `thinkster.authentication.services` as dependencies.
+
+    angular
+      .module('thinkster.authentication.controllers', []);
+
+This syntax defines the module `thinkster.authentication.controllers` with no dependencies.
+
+Now we need define to include `thinkster.authentication` and `thinkster.routes` as dependencies of `thinkster`.
+
+Open `static/javascripts/thinkster.js`, define the required modules, and include them as dependencies of the `thinkster` module. Note that `thinkster.routes` relies on `ngRoute`, which is included with the boilerplate project.
+
+    (function () {
+      'use strict';
+
+      angular
+        .module('thinkster', [
+          'thinkster.routes',
+          'thinkster.authentication'
+        ]);
+
+      angular
+        .module('thinkster.routes', ['ngRoute']);
+    })();
+
+
+    Update the `thinkster` module to include it's new dependencies
+
+**Hash routing**
+By default, Angular uses a feature called hash routing. If you've ever seen a URL that looks like `www.google.com/#/search` then you know what I'm talking about. Again, this is personal preference, but I think those are incredibly ugly. To get rid of hash routing, we can enabled `$locationProvider.html5Mode`. In older browsers that do not support HTML5 routing, Angular will intelligently fall back to hash routing.
+
+Create a file in `static/javascripts/` called `thinkster.config.js` and give it the following content:
+
+    (function () {
+      'use strict';
+
+      angular
+        .module('thinkster.config')
+        .config(config);
+
+      config.$inject = ['$locationProvider'];
+
+      /**
+      * @name config
+      * @desc Enable HTML5 routing
+      */
+      function config($locationProvider) {
+        $locationProvider.html5Mode(true);
+        $locationProvider.hashPrefix('!');
+      }
+    })();
+
+
+
+    Enable HTML5 routing for AngularJS
+
+As mentioned, enabling `$locationProvider.html5Mode` gets rid of the hash sign in the URL. The other setting here, `$locationProvider.hashPrefix`, turns the `#` into a `#!`. This is mostly for the benefit of search engines.
+
+Because we are using a new module here, we need to open up `static/javascripts/thinkster.js`, define the module, and include is as a dependency for the `thinkster` module.
+
+    angular
+      .module('thinkster', [
+        'thinkster.config',
+        // ...
+      ]);
+
+    angular
+      .module('thinkster.config', []);
+
+
+    Define the `thinkster.config` module
+
+**Include new .js files**
+In this chapter so far, we have already created a number of new JavaScript files. We need to include these in the client by adding them to `templates/javascripts.html` inside the `{% compress js %}` block.
+
+Open `templates/javascripts.html` and add the following above the `{% endcompress %}` tag:
+
+    <script type="text/javascript" src="{% static 'javascripts/thinkster.config.js' %}"></script>
+    <script type="text/javascript" src="{% static 'javascripts/thinkster.routes.js' %}"></script>
+    <script type="text/javascript" src="{% static 'javascripts/authentication/authentication.module.js' %}"></script>
+    <script type="text/javascript" src="{% static 'javascripts/authentication/services/authentication.service.js' %}"></script>
+    <script type="text/javascript" src="{% static 'javascripts/authentication/controllers/register.controller.js' %}"></script>
+
+
+    Add the new JavaScript files to `templates/javascripts.html`
+
+**Handling CSRF protection**
+Because we are using session-based authentication, we have to worry about CSRF protection. We don't go into detail on CSRF here because it's outside the scope of this tutorial, but suffice it to say that CSRF is very bad.
+
+Django, by default, stores a CSRF token in a cookie named `csrftoken` and expects a header with the name `X-CSRFToken` for any dangerous HTTP request (`POST`, `PUT`, `PATCH`, `DELETE`). We can easily configure Angular to handle this.
+
+Open up `static/javascripts/thinkster.js` and add the following under your module definitions:
+
+    angular
+      .module('thinkster')
+      .run(run);
+
+    run.$inject = ['$http'];
+
+    /**
+    * @name run
+    * @desc Update xsrf $http headers to align with Django's defaults
+    */
+    function run($http) {
+      $http.defaults.xsrfHeaderName = 'X-CSRFToken';
+      $http.defaults.xsrfCookieName = 'csrftoken';
+    }
+
+
+    Configure AngularJS CSRF settings
+
+**Checkpoint**
+Try registering a new user by running your server (`python manage.py runserver`), visiting `http://localhost:8000/register` in your browser and filling out the form.
+
+If the registration worked, you can view the new `Account` object created by opening the shell (`python manage.py shell`) and running the following commands:
+
+    >>> from authentication.models import Account
+    >>> Account.objects.latest('created_at')
+
+The `Account` object returned should match the one you just created.
+
+
+    Register a new user at `http://localhost:8000/register` and confirm the `Account` object was created
+
+## Chapter 04
+
+### Logging users in
+
+Now that users can register, they need a way to log in. As it turns out, this is part of what we are missing from our registration system. Once a user registers, we should automatically log them in.
+
+To get started, we will create views for logging in and logging out. Once those are done we will progress in a fashion similar to the registration systems: services, controllers, etc.
+
+**Making the login API view**
+
+Open up `authentication/views.py` and add the following:
+
+    import json
+
+    from django.contrib.auth import authenticate, login
+
+    from rest_framework improt status, views
+    from rest_framework.response import Response
+
+    class LoginView(views.APIView):
+        def post(self, request, format=None):
+            data = json.loads(request.body)
+
+            email = data.get('email', None)
+            password = data.get('password', None)
+
+            account = authenticate(email=email, password=password)
+
+            if account is not None:
+                if account.is_active:
+                    login(request, account)
+
+                    serialized = AccountSerializer(account)
+
+                    return Response(serialized.data)
+                else:
+                    return Response({
+                        'status': 'Unauthorized',
+                        'message': 'This account has been disabled.'
+                    }, status=status.HTTP_401_UNAUTHORIZED)
+            else:
+                return Response({
+                    'status': 'Unauthorized',
+                    'message': 'Username/password combination invalid.'
+                }, status=status.HTTP_401_UNAUTHORIZED)
+
+
+    Make a view called `LoginView` in `authentication/views.py`
+
+This is a longer snippet than we've seen in the past, but we will approach it the same way: by talking about what's new and ignoring what we have already encountered.
+
+     class LoginView(views.APIView):
+
+You will notice that we are not using a generic view this time. Because this view does not perfect a generic activity like creating or updating an object, we must start with something more basic. Django REST Framework's `views.APIView` is what we use. While `APIView` does not handle everything for us, it does give us much more than standard Django views do. In particular, `views.APIView` are made specifically to handle AJAX requests. This turns out to save us a lot of time.
+
+    def post(self, request, format=None):
+
+Unlike generic views, we must handle each HTTP verb ourselves. Logging in should typically be a `POST` request, so we override the `self.post()` method.
+
+    account = authenticate(email=email, password=password)
+
+Django provides a nice set of utilities for authenticating users. The `authenticate()` method is the first utility we will cover. `authenticate()` takes an email and a password. Django then checks the database for an `Account` with email `email`. If one is found, Django will try to verify the given password. If the username and password are correct, the `Account` found by `authenticate()` is returned. If either of these steps fail, `authenticate()` will return `None`.
+
+    if account is not None:
+        # ...
+    else:
+        return Response({
+            'status': 'Unauthorized',
+            'message': 'Username/password combination invalid.'
+        }, status=status.HTTP_401_UNAUTHORIZED)
+
+In the event that `authenticate()` returns `None`, we respond with a `401` status code and tell the user that the email/password combination they provided is invalid.
+
+    if account.is_active:
+        # ...
+    else:
+        return Response({
+            'status': 'Unauthorized',
+            'message': 'This account has been disabled.'
+        }, status=status.HTTP_401_UNAUTHORIZED)
+
+If the user's account is for some reason inactivate, we respond with a `401` status code. Here we simply say that the account has been disabled.
+
+    login(request, account)
+
+If `authenticate()` success and the user is active, then we use Django's `login()` utility to create a new session for this user.
+
+    serialized = AccountSerializer(account)
+
+    return Response(serialized.data)
+
+We want to store some information about this user in the browser if the login request succeeds, so we serialize the `Account` object found by `authenticate()` and return the resulting JSON as the response.
+
+**Adding a login API endpoint**
+
+Just as we did with `AccountViewSet`, we need to add a route for `LoginView`.
+
+Open up `thinkster_django_angular_boilerplate/urls.py` and add the following URL between `^/api/v1/` and `^`:
+
+    from authentication.views import LoginView
+
+    urlpatterns = patterns(
+        # ...
+        url(r'^api/v1/auth/login/$', LoginView.as_view(), name='login'),
+        # ...
+    )
+
+
+    Add an API endpoint for `LoginView`
+
+**Authentication Service**
+
+Let's add some more methods to our `Authentication` service. We will do this in two stages. First we will add a `login()` method and then we will add some utility methods for storing session data in the browser.
+
+Open `static/javascripts/authentication/services/authentication.service.js` and add the following method to the `Authentication` object we created earlier:
+
+    /**
+     * @name login
+     * @desc Try to log in with email `email` and password `password`
+     * @param {string} email The email entered by the user
+     * @param {string} password The password entered by the user
+     * @returns {Promise}
+     * @memberOf thinkster.authentication.services.Authentication
+     */
+    function login(email, password) {
+      return $http.post('/api/v1/auth/login/', {
+        email: email, password: password
+      });
+    }
+
+Make sure to expose it as part of the service:
+
+    var Authentication = {
+      login: login,
+      register: register
+    };
+
+
+    Add a `login` method to your `Authentication` service
+
+Much like the `register()` method from before, `login()` returns makes an AJAX request to our API and returns a promise.
+
+Now let's talk about a few utility methods we need for managing session information on the client.
+
+We want to display information about the currently authenticated user in the navigation bar at the top of the page. This means we will need a way to store the response returned by `login()`. We will also need a way to retrieve the authenticated user. We need need a way to unauthenticate the user in the browser. Finally, it would be nice to have an easy way to check if the current user is authenticated.
+
+*NOTE: Unauthenticating is different from logging out. When a user logs out, we need a way to remove all remaining session data from the client.*
+
+Given these requirements, I suggest three methods: `getAuthenticatedAccount`, `isAuthenticated`, `setAuthenticatedAccount`, and `unauthenticate`.
+
+Let's implement these now. Add each of the following functions to the `Authentication` service:
+
+    /**
+     * @name getAuthenticatedAccount
+     * @desc Return the currently authenticated account
+     * @returns {object|undefined} Account if authenticated, else `undefined`
+     * @memberOf thinkster.authentication.services.Authentication
+     */
+    function getAuthenticatedAccount() {
+      if (!$cookies.authenticatedAccount) {
+        return;
+      }
+
+      return JSON.parse($cookies.authenticatedAccount);
+    }
+
+If there is no `authenticatedAccount` cookie (set in `setAuthenticatedAccount()`), then return; otherwise return the parsed user object from the cookie.
+
+    /**
+     * @name isAuthenticated
+     * @desc Check if the current user is authenticated
+     * @returns {boolean} True is user is authenticated, else false.
+     * @memberOf thinkster.authentication.services.Authentication
+     */
+    function isAuthenticated() {
+      return !!$cookies.authenticatedAccount;
+    }
+
+Return the boolean value of the `authenticatedAccount` cookie. 
+
+    /**
+     * @name setAuthenticatedAccount
+     * @desc Stringify the account object and store it in a cookie
+     * @param {Object} user The account object to be stored
+     * @returns {undefined}
+     * @memberOf thinkster.authentication.services.Authentication
+     */
+    function setAuthenticatedAccount(account) {
+      $cookies.authenticatedAccount = JSON.stringify(account);
+    }
+
+Set the `authenticatedAccount` cookie to a stringified version of the `account` object.
+
+    /**
+     * @name unauthenticate
+     * @desc Delete the cookie where the user object is stored
+     * @returns {undefined}
+     * @memberOf thinkster.authentication.services.Authentication
+     */
+    function unauthenticate() {
+      delete $cookies.authenticatedAccount;
+    }
+
+Remove the `authenticatedAccount` cookie.
+
+Again, don't forget to expose these methods as part of the service:
+
+    var Authentication = {
+      getAuthenticatedAccount: getAuthenticatedAccount,
+      isAuthenticated: isAuthenticated,
+      login: login,
+      register: register,
+      setAuthenticatedAccount: setAuthenticatedAccount,
+      unauthenticate: unauthenticate
+    };
+
+
+
+    Add `getAuthenticatedAccount`, `isAuthenticated`, `setAuthenticatedAccount`, and `unauthenticate` methods to your `Authentication` service
+
+Before we move on to the login interface, let's quickly update the `login` method of the `Authentication` service to use one of these new utility methods. Replace `Authentication.login` with the following:
+
+    /**
+     * @name login
+     * @desc Try to log in with email `email` and password `password`
+     * @param {string} email The email entered by the user
+     * @param {string} password The password entered by the user
+     * @returns {Promise}
+     * @memberOf thinkster.authentication.services.Authentication
+     */
+    function login(email, password) {
+      return $http.post('/api/v1/auth/login/', {
+        email: email, password: password
+      }).then(loginSuccessFn, loginErrorFn);
+
+      /**
+       * @name loginSuccessFn
+       * @desc Set the authenticated account and redirect to index
+       */
+      function loginSuccessFn(data, status, headers, config) {
+        Authentication.setAuthenticatedAccount(data.data);
+
+        window.location = '/';
+      }
+
+      /**
+       * @name loginErrorFn
+       * @desc Log "Epic failure!" to the console
+       */
+      function loginErrorFn(data, status, headers, config) {
+        console.error('Epic failure!');
+      }
+    }
+
+
+
+    Update `Authentication.login` to use our new utility methods
+
+**Making a login interface**
+We now have `Authentication.login()` to log a user in, so let's create the login form. Open up `static/templates/authentication/login.html` and add the following HTML:
+
+    <div class="row">
+      <div class="col-md-4 col-md-offset-4">
+        <h1>Login</h1>
+
+        <div class="well">
+          <form role="form" ng-submit="vm.login()">
+            <div class="alert alert-danger" ng-show="error" ng-bind="error"></div>
+
+            <div class="form-group">
+              <label for="login__email">Email</label>
+              <input type="text" class="form-control" id="login__email" ng-model="vm.email" placeholder="ex. john@example.com" />
+            </div>
+
+            <div class="form-group">
+              <label for="login__password">Password</label>
+              <input type="password" class="form-control" id="login__password" ng-model="vm.password" placeholder="ex. thisisnotgoogleplus" />
+            </div>
+
+            <div class="form-group">
+              <button type="submit" class="btn btn-primary">Submit</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+
+    Create a `login.html` template
+
+**Controlling the login interface with LoginController**
+
+Create a file in `static/javascripts/authentication/controllers/` called `login.controller.js` and add the following contents:
+
+    /**
+    * LoginController
+    * @namespace thinkster.authentication.controllers
+    */
+    (function () {
+      'use static';
+
+      angular
+        .module('thinkster.authentication.controllers')
+        .controller('LoginController', LoginController);
+
+      LoginController.$inject = ['$location', '$scope', 'Authentication'];
+
+      /**
+      * @namespace LoginController
+      */
+      function LoginController($location, $scope, Authentication) {
+        var vm = this;
+
+        vm.login = login;
+
+        activate();
+
+        /**
+        * @name activate
+        * @desc Actions to be performed when this controller is instantiated
+        * @memberOf thinkster.authentication.controllers.LoginController
+        */
+        function activate() {
+          // If the user is authenticated, they should not be here.
+          if (Authentication.isAuthenticated()) {
+            $location.url('/');
+          }
+        }
+
+        /**
+        * @name login
+        * @desc Log the user in
+        * @memberOf thinkster.authentication.controllers.LoginController
+        */
+        function login() {
+          Authentication.login(vm.email, vm.password);
+        }
+      }
+    })();
+
+
+    Make a controller called `LoginController` in `static/javascripts/authentication/controllers/login.controller.js`
+
+Let's look at the `activate` function.
+
+    function activate() {
+      // If the user is authenticated, they should not be here.
+      if (Authentication.isAuthenticated()) {
+        $location.url('/');
+      }
+    }
+
+You will start to notice that we use a function called `activate` a lot throughout this tutorial. There is nothing inherently special about this name; we chose a standard name for the function that will be run when any given controller is instantiated.
+
+As the comment suggests, if a user is already authenticated, they have no business on the login page. We solve this by redirecting the user to the index page. 
+
+We should do this on the registration page too. When we wrote the registration controller, we didn't have `Authentication.isAuthenticated()`. We will update `RegisterController` shortly.
+
+**Back to RegisterController**
+Taking a step back, let's add a check to `RegisterController` and redirect the user if they are already authenticated.
+
+Open `static/javascripts/authentication/controllers/register.controller.js` and add the following just inside the definition of the controller:
+
+    /**
+     * @name activate
+     * @desc Actions to be performed when this controller is instantiated
+     * @memberOf thinkster.authentication.controllers.RegisterController
+     */
+    function activate() {
+      // If the user is authenticated, they should not be here.
+      if (Authentication.isAuthenticated()) {
+        $location.url('/');
+      }
+    }
+
+
+    Redirect authenticated users to the index view in `RegisterController`
+
+If you remember, we also talked about logging a user in automatically when they register. Since we are already updating registration related content, let's update the `register` method in the `Authentication` service.
+
+Replace `Authentication.register` when the following:
+
+    /**
+    * @name register
+    * @desc Try to register a new user
+    * @param {string} email The email entered by the user
+    * @param {string} password The password entered by the user
+    * @param {string} username The username entered by the user
+    * @returns {Promise}
+    * @memberOf thinkster.authentication.services.Authentication
+    */
+    function register(email, password, username) {
+      return $http.post('/api/v1/accounts/', {
+        username: username,
+        password: password,
+        email: email
+      }).then(registerSuccessFn, registerErrorFn);
+
+      /**
+      * @name registerSuccessFn
+      * @desc Log the new user in
+      */
+      function registerSuccessFn(data, status, headers, config) {
+        Authentication.login(email, password);
+      }
+
+      /**
+      * @name registerErrorFn
+      * @desc Log "Epic failure!" to the console
+      */
+      function registerErrorFn(data, status, headers, config) {
+        console.error('Epic failure!');
+      }
+    }
+
+
+    Update `Authentication.register`
+
+**Making a route for the login interface**
+
+The next step is to create the client-side route for the login form.
+
+Open up `static/javascripts/thinkster.routes.js` and add a route for the login form:
+
+    $routeProvider.when('/register', {
+      controller: 'RegisterController', 
+      controllerAs: 'vm',
+      templateUrl: '/static/templates/authentication/register.html'
+    }).when('/login', {
+      controller: 'LoginController',
+      controllerAs: 'vm',
+      templateUrl: '/static/templates/authentication/login.html'
+    }).otherwise('/');
+
+
+    Add a route for `LoginController`
+
+    See how you can chain calls to `$routeProvider.when()`? Going forward, we will ignore old routes for brevity. Just keep in mind that these calls should be chained and that the first route matched will take control.
+
+**Include new .js files**
+
+If you can believe it, we've only created one new JavaScript file since the last time: `login.controller.js`. Let's add it to `javascripts.html` with the other JavaScript files:
+
+    <script type="text/javascript" src="{% static 'javascripts/authentication/controllers/login.controller.js' %}"></script>
+
+
+    Include `login.controller.js` in `javascripts.html`
+
+**Checkpoint**
+
+Open `http://localhost:8000/login` in your browser and log in with the user you created earlier. If this works, the page should redirect to `http://localhost:8000/` and the navigation bar should change.
+
+
+    Log in with one of the users you created earlier by visiting `http://localhost:8000/login`
+
+## Chapter 05
+
+### Logging users out
+Given that users can register and login, we can assume they will want a way to log out. People get mad when they can't log out.
+
+**Making a logout API view**
+
+Let's implement the last authentication-related API view.
+
+Open up `authentication/views.py` and add the following imports and class:
+
+    from django.contrib.auth import logout
+
+    from rest_framework import permissions
+
+    class LogoutView(views.APIView):
+        permission_classes = (permissions.IsAuthenticated,)
+
+        def post(self, request, format=None):
+            logout(request)
+
+            return Response({}, status=status.HTTP_204_NO_CONTENT)
+
+
+    Make a view called `LogoutView` in `authentication/views.py`
+
+There are only a few new things to talk about this time.
+
+    permission_classes = (permissions.IsAuthenticated,)
+
+Only authenticated users should be able to hit this endpoint. Django REST Framework's `permissions.IsAuthenticated` handles this for us. If you user is not authenticated, they will get a `403` error.
+
+    logout(request)
+
+If the user is authenticated, all we need to do is call Django's `logout()` method.
+
+    return Response({}, status=status.HTTP_204_NO_CONTENT)
+
+There isn't anything reasonable to return when logging out, so we just return an empty response with a `200` status code.
+
+Moving on to the URLs.
+
+Open up `thinkster_django_angular_boilerplate/urls.py` again and add the following import and URL:
+
+    from authentication.views import LogoutView
+
+    urlpatterns = patterns(
+        # ...
+        url(r'^api/v1/auth/logout/$', LogoutView.as_view(), name='logout'),
+        #...
+    )
+
+
+    Create an API endpoint for `LogoutView`
+
+** Logout: AngularJS Service**
+
+The final method you need to add to your `Authentication` service is the `logout()` method.
+
+Add the following method to the `Authentication` service in `authentication.service.js`:
+
+    /**
+     * @name logout
+     * @desc Try to log the user out
+     * @returns {Promise}
+     * @memberOf thinkster.authentication.services.Authentication
+     */
+    function logout() {
+      return $http.post('/api/v1/auth/logout/')
+        .then(logoutSuccessFn, logoutErrorFn);
+
+      /**
+       * @name logoutSuccessFn
+       * @desc Unauthenticate and redirect to index with page reload
+       */
+      function logoutSuccessFn(data, status, headers, config) {
+        Authentication.unauthenticate();
+
+        window.location = '/';
+      }
+
+      /**
+       * @name logoutErrorFn
+       * @desc Log "Epic failure!" to the console
+       */
+      function logoutErrorFn(data, status, headers, config) {
+        console.error('Epic failure!');
+      }
+    }
+
+As always, remember to expose `logout` as part of the `Authentication` service:
+
+    var Authentication = {
+      getAuthenticatedUser: getAuthenticatedUser,
+      isAuthenticated: isAuthenticated,
+      login: login,
+      logout: logout,
+      register: register,
+      setAuthenticatedUser: setAuthenticatedUser,
+      unauthenticate: unauthenticate
+    };
+
+
+    Add a `logout()` method to your `Authentication` service
+
+** Controlling the navigation bar with NavbarController**
+
+There will not actually be a `LogoutController` or `logout.html`. Instead, the navigation bar already contains a logout link for authenticated users. We will create a `NavbarController` for handling the logout buttons `onclick` functionality and we will update the link itself with an `ng-click` attribute.
+
+Create a file in `static/javascripts/layout/controllers/` called `navbar.controller.js` and add the following to it:
+
+    /**
+    * NavbarController
+    * @namespace thinkster.layout.controllers
+    */
+    (function () {
+      'use strict';
+
+      angular
+        .module('thinkster.layout.controllers')
+        .controller('NavbarController', NavbarController);
+
+      NavbarController.$inject = ['$scope', 'Authentication'];
+
+      /**
+      * @namespace NavbarController
+      */
+      function NavbarController($scope, Authentication) {
+        var vm = this;
+
+        vm.logout = logout;
+
+        /**
+        * @name logout
+        * @desc Log the user out
+        * @memberOf thinkster.layout.controllers.NavbarController
+        */
+        function logout() {
+          Authentication.logout();
+        }
+      }
+    })();
+
+
+    Create a `NavbarController` in `static/javascripts/layout/controllers/navbar.controller.js`
+
+Open `templates/navbar.html` and add an `ng-controller` directive with the value `NavbarController as vm` to the `<nav />` tag like so:
+
+    <nav class="navbar navbar-default" role="navigation" ng-controller="NavbarController as vm">
+
+While you have `templates/navbar.html` open, go ahead and find the logout link and add `ng-click="vm.logout()"` to it like so:
+
+    <li><a href="javascript:void(0)" ng-click="vm.logout()">Logout</a></li>
+
+
+    Update `navbar.html` to include the `ng-controller` and `ng-click` directives where appropriate
+
+** Layout modules**
+
+We need to add a few new modules this time around.
+
+Create a file in `static/javascripts/layout/` called `layout.module.js` and give it the following contents:
+
+    (function () {
+      'use strict';
+
+      angular
+        .module('thinkster.layout', [
+          'thinkster.layout.controllers'
+        ]);
+
+      angular
+        .module('thinkster.layout.controllers', []);
+    })();
+
+
+And don't forget to update `static/javascripts/thinkster.js` also:
+
+    angular
+      .module('thinkster', [
+        'thinkster.config',
+        'thinkster.routes',
+        'thinkster.authentication',
+        'thinkster.layout'
+      ]);
+
+
+    Define new `thinkster.layout` and `thinkster.layout.controllers` modules
+
+** Including new .js files**
+
+This time around there are a couple new JavaScript files to include. Open up `javascripts.html` and add the following:
+
+    <script type="text/javascript" src="{% static 'javascripts/layout/layout.module.js' %}"></script>
+    <script type="text/javascript" src="{% static 'javascripts/layout/controllers/navbar.controller.js' %}"></script>
+
+
+    Include new JavaScript files in `javascripts.html`
+
+** Checkpoint**
+
+If you visit `http://localhost:8000/` in your browser, you should still be logged in. If not, you will need to log in again.
+
+You can confirm the logout functionality is working by clicking the logout button in the navigation bar. This should refresh the page and update the navigation bar to it's logged out view.
+
+
+    Log out of your account by using the logout button in the navigation bar
+
+## Chapter 06
+
+### Making a Post model
+In this section we will make a new app and create a `Post` model similar to a status on Facebook or a tweet on Twitter. After we create our model we will move on to serializing `Post`s and then we will create a few new endpoints for our API.
+
+**Making a posts app**
+
+First things first: go ahead and create a new app called `posts`.
+
+    $ python manage.py startapp posts
+
+
+    Make a new app named `posts`
+
+Remember: whenever you create a new app you have to add it to the `INSTALLED_APPS` setting. Open `thinkster_django_angular_boilerplate/settings.py` and modify it like so:
+
+    INSTALLED_APPS = (
+        # ...
+        'posts',
+    )
+
+** Making the Post model**
+
+After you create the `posts` app Django made a new file called `posts/models.py`. Go ahead and open it up and add the following:
+
+from django.db import models
+
+from authentication.models import Account
+
+
+    class Post(models.Model):
+        author = models.ForeignKey(Account)
+        content = models.TextField()
+
+        created_at = models.DateTimeField(auto_now_add=True)
+        updated_at = models.DateTimeField(auto_now=True)
+
+        def __unicode__(self):
+            return '{0}'.format(self.content)
+
+
+    Make a new model called `Post` in `posts/models.py`
+
+Our method of walking through the code line-by-line is working well so far. Why mess with a good thing? Let's do it.
+
+    author = models.ForeignKey(Account)
+
+Because each `Account` can have many `Post` objects, we need to set up a many-to-one relation.
+
+The way to do this in Django is with using a `ForeignKey` field to associate each `Post` with a `Account`. 
+
+Django is smart enough to know the foreign key we've set up here should be reversible. That is to say, given a `Account`, you should be able to access that user's `Post`s. In Django these `Post` objects can be accessed through `Account.post_set` (not `Account.posts`).
+
+Now that the model exists, don't forget to migrate.
+
+    $ python manage.py makemigrations
+    $ python manage.py migrate
+
+
+    Make migrations for `Post` and apply them
+
+** Serializing the Post model**
+
+Create a new file in `posts/` called `serializers.py` and add the following:
+
+    from rest_framework import serializers
+
+    from authentication.serializers import Account
+    from posts.models import Post
+
+
+    class PostSerializer(serializers.ModelSerializer):
+        author = AccountSerializer(read_only=True, required=False)
+
+        class Meta:
+            model = Post
+
+            fields = ('id', 'author', 'content', 'created_at', 'updated_at')
+            read_only_fields = ('id', 'created_at', 'updated_at')
+
+        def get_validation_exclusions(self, *args, **kwargs):
+            exclusions = super(PostSerializer, self).get_validation_exclusions()
+
+            return exclusions + ['author']
+
+
+    Make a new serializer called `PostSerializer` in `posts/serializers.py`
+
+There isn't much here that's new, but there is one line in particular I want to look at.
+
+    author = AccountSerializer(read_only=True, required=False)
+
+We explicitly defined a number of fields in our `AccountSerializer` from before, but this definition is a little different.
+
+When serializing a `Post` object, we want to include all of the author's information. Within Django REST Framework, this is known as a nested relationship. Basically, we are serializing the `Account` related to this `Post` and including it in our JSON.
+
+We pass `read_only=True` because we should not be updating an `Account` object with a `PostSerializer`. We also set `required=False` here because we will set the author of this post automatically.
+
+    def get_validation_exclusions(self, *args, **kwargs):
+        exclusions = super(PostSerializer, self).get_validation_exclusions()
+
+        return exclusions + ['author']
+
+For the same reason we use `required=False`, we must also add `author` to the list of validations we wish to skip.
+
+** Making API views for Post objects**
+
+The next step in creating `Post` objects is adding an API endpoint that will handle performing actions on the `Post` model such as create or update.
+
+Replace the contents of `posts/views.py` with the following:
+
+    from rest_framework import permissions, viewsets
+    from rest_framework.response import Response
+
+    from posts.models import Post
+    from posts.permissions import IsAuthorOfPost
+    from posts.serializers import PostSerializer
+
+
+    class PostViewSet(viewsets.ModelViewSet):
+        queryset = Post.objects.order_by('-created_at')
+        serializer_class = PostSerializer
+
+        def get_permissions(self):
+            if self.request.method in permissions.SAFE_METHODS:
+                return (permissions.AllowAny(),)
+            return (permissions.IsAuthenticated(), IsAuthorOfPost(),)
+
+	def perform_create(self, serializer):
+		instance = serializer.save(author=self.request.user)
+
+		return super(PostViewSet, self).perform_create(serializer)
+
+
+
+    class AccountPostsViewSet(viewsets.ViewSet):
+        queryset = Post.objects.select_related('author').all()
+        serializer_class = PostSerializer
+
+        def list(self, request, account_username=None):
+            queryset = self.queryset.filter(author__username=account_username)
+            serializer = self.serializer_class(queryset, many=True)
+
+            return Response(serializer.data)
+
+
+    Make a `PostViewSet` viewset
+
+
+    Make an `AccountPostsViewSet` viewset
+
+Do these views look similar? They aren't that different than the ones we made to create `User` objects.
+
+    def perform_create(self, serializer):
+        instance = serializer.save(author=self.request.user)
+
+        return super(PostViewSet, self).perform_create(serializer)
+
+
+`perform_create` is called before the model of this view is saved.
+
+When a `Post` object is created it has to be associated with an author. Making the author type in their own username or id when creating adding a post to the site would be a bad experience, so we handle this association for them with the `perform_create` hook. We simply grab the user associated with this request and make them the author of this `Post`.
+
+    def get_permissions(self):
+        if self.request.method in permissions.SAFE_METHODS:
+            return (permissions.AllowAny(),)
+        return (permissions.IsAuthenticated(), IsAuthorOfPost(),)
+
+
+Similar to the permissions we used for the `Account` viewset, dangerous HTTP methods require the user be authenticated and authorized to make changes to this `Post`. We will created the `IsAuthorOfPost` permission shortly. If the HTTP method is safe, we allow anyone to access this view.
+
+    class AccountPostsViewSet(viewsets.ViewSet):
+
+This viewset will be used to list the posts associated with a specific `Account`.
+
+    queryset = self.queryset.filter(author__username=account_username)
+
+Here we filter our queryset based on the author's username. The `account_username` argument will be supplied by the router we will create in a few minutes.
+
+** Making the IsAuthorOfPost permission**
+
+Create `permissions.py` in the `posts/` directory with the following content:
+
+    from rest_framework import permissions
+
+
+    class IsAuthorOfPost(permissions.BasePermission):
+        def has_object_permission(self, request, view, post):
+            if request.user:
+                return post.author == request.user
+            return False
+
+
+    Make a new permission called `IsAuthenticatedAndOwnsObject` in `posts/permissions.py`
+
+We will skip the explanation for this. This permission is almost identical to the one we made previously.
+
+** Making an API endpoint for posts**
+
+With the views created, it's time to add the endpoints to our API.
+
+Open `thinkster_django_angular_boilerplate/urls.py` and add the following import:
+
+    from posts.views import AccountPostsViewSet, PostViewSet
+
+Now add these lines just above `urlpatterns = patterns(`:
+
+    router.register(r'posts', PostViewSet)
+
+    accounts_router = routers.NestedSimpleRouter(
+        router, r'accounts', lookup='account'
+    )
+    accounts_router.register(r'posts', AccountPostsViewSet)
+
+`accounts_router` provides the nested routing need to access the posts for a specific `Account`. You should also now add `accounts_router` to `urlpatterns` like so:
+
+    urlpatterns = patterns(
+      # ...
+      
+      url(r'^api/v1/', include(router.urls)),
+      url(r'^api/v1/', include(accounts_router.urls)),
+
+      # ...
+    )
+
+
+    Make an API endpoint for the `PostViewSet` viewset
+
+
+    Make an API endpoint for the `AccountPostsViewSet` viewset
+
+** Checkpoint**
+
+At this point, feel free to open up your shell with `python manage.py shell` and play around with creating and serializing `Post` objects.
+
+    >>> from authentication.models import Account
+    >>> from posts.models import Post
+    >>> from posts.serializers import PostSerializer
+    >>> account = Account.objects.latest('created_at')
+    >>> post = Post.objects.create(author=account, content='I promise this is not Google Plus!')
+    >>> serialized_post = PostSerializer(post)
+    >>> serialized_post.data
+
+
+    Play around with the `Post` model and `PostSerializer` serializer in Django's shell
+
+We will confirm the views are working at the end of the next section.
 
