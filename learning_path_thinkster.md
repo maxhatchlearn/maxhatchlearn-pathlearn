@@ -1959,7 +1959,7 @@ At this point, feel free to open up your shell with `python manage.py shell` and
     >>> serialized_post.data
 
 
-######Play around with the `Post` model and `PostSerializer` serializer in Django's shell
+**Play around with the `Post` model and `PostSerializer` serializer in Django's shell
 
 We will confirm the views are working at the end of the next section.
 
