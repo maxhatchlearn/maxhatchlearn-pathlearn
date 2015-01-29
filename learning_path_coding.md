@@ -40,6 +40,13 @@ Coding Exercises
 | output       | 2
 | description  | Math.ceil() method rounds number
 
-
-
-
+| problem type | coding                                         
+|--------------|--------------------------------------------------------
+| name         | gsub practice
+| statement    | use replace to replace the l's in hello with z's
+| explanation  | .replace(/l/g, "z") replaces every instace of l with z
+| language     | JavaScript
+| start        | "hello"
+| solution     | "hello".replace(/l/g, "z")
+| output       | "hezzo"
+| description  | replaced l with z
