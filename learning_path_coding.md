@@ -1,4 +1,4 @@
-Coding Exercises
+Ruby And JavaScript Coding Exercises
 ================================================================================
 
 ## Coding Exercises Module
