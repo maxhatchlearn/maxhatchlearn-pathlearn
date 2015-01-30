@@ -1,7 +1,7 @@
-Facebook/React - A declarative, efficient, and flexible JavaScript library for building user interfaces.
+Facebook/React
 ================================================================================
 
-## Facebook/React Module
+## A declarative, efficient, and flexible JavaScript library for building user interfaces.
 
 ### Intro
 
